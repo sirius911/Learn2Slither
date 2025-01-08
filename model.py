@@ -24,6 +24,10 @@ class Linear_QNet(nn.Module):
         file_name = os.path.join(model_folder_path, file_name)
         torch.save(self.state_dict(), file_name)
 
+    def load(self, file_name='model.pth'):
+        file_name = os.path.join('./model', file_name)
+        self.load_state_dict(torch.load(file_name))
+
 
 class QTrainer:
     def __init__(self, model, lr, gamma): #initializing 
