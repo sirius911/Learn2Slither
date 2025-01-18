@@ -34,12 +34,15 @@ class Linear_QNet(nn.Module):
             os.makedirs(model_folder_path)
 
         file_name = os.path.join(model_folder_path, file_name)
+        print(f"Sauvegarde de {file_name}", end=" ... ")
         torch.save(self.state_dict(), file_name)
+        print("Ok")
 
     def load(self, file_name='model.pth'):
         file_name = os.path.join('./model', file_name)
-        self.load_state_dict(torch.load(file_name))
-
+        print(f"Chargement de {file_name}", end=" ... ")
+        self.load_state_dict(torch.load(file_name, weights_only=True))
+        print("Ok")
 
 class QTrainer:
     def __init__(self, model, lr, gamma): #initializing 
@@ -94,3 +97,7 @@ class QTrainer:
         loss = self.criterion(target, pred)
         loss.backward()
         self.optimizer.step()
+
+        # Retourner la valeur de la perte
+        return loss.item()
+

@@ -164,7 +164,8 @@ class SnakeGameAI:
             # Mettre à jour l'interface utilisateur
             self._update_ui()
             self.clock.tick(SPEED)
-
+        if self.score < 0:
+            self.score = 0
         return reward, game_over, self.score
     
     def _move(self, action, step):

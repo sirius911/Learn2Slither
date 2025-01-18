@@ -41,8 +41,9 @@ class Agent:
         self.trainer.train_step(states, actions, rewards, next_states, dones)
 
     def train_short_memory(self, state, action, reward, next_state, done):
-        self.trainer.train_step(state, action, reward, next_state, done)
-
+        loss = self.trainer.train_step(state, action, reward, next_state, done)
+        return loss
+    
     def get_action(self, game, state, learning=True):
         # self.epsilon = 80 - self.n_games
         self.epsilon = calc_epsilon(self.n_games)

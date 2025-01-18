@@ -45,18 +45,30 @@ class Direction(Enum):
 plt.ion()
 
 # Initialisation de la figure globale et des axes
-fig, ax1, ax2 = None, None, None
+fig, ax1, ax2, ax3 = None, None, None, None
 
-def plot(scores, mean_scores, explorations, exploitations, epsilon_values, title='Training'):
-    global fig, ax1, ax2  # Utilisation des variables globales pour la figure et les axes
+def plot(scores, mean_scores, explorations, exploitations, epsilon_values, losses, learning):
+    global fig, ax1, ax2, ax3  # Variables globales pour la figure et les axes
 
-    if fig is None or ax1 is None or ax2 is None:  # Initialisation unique
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    title = ('Training' if learning else 'Gaming')
+
+    # Initialisation unique de la figure avec 3 sous-graphiques
+    if fig is None:
+        if learning:
+            fig, axes = plt.subplots(3, 1, figsize=(10, 12))
+            ax1, ax2, ax3 = axes
+        else:
+            fig, axes = plt.subplots(1, 1, figsize=(10, 12))
+            ax1= axes
         fig.suptitle(title)
 
-    # Effacer le contenu des axes sans recréer de figure
-    ax1.clear()
-    ax2.clear()
+    # Effacer le contenu des axes sans recréer la figure
+    if learning:
+        ax1.clear()
+        ax2.clear()
+        ax3.clear()  # Toujours nettoyé, mais n'est pas utilisé si `learning=False`
+    else:
+        ax1.clear()
 
     # --- Premier graphique : Scores et Epsilon ---
     ax1.set_title('Scores and Epsilon')
@@ -81,44 +93,80 @@ def plot(scores, mean_scores, explorations, exploitations, epsilon_values, title
         ax1.plot(range(window_size-1, len(scores)), moving_avg, label='Moving Avg (100 Games)', linestyle='--', color='green')
 
     # Ajouter un axe secondaire pour Epsilon
+    if learning:
+        if len(epsilon_values) > 0 and learning:
+            ax4 = ax1.twinx()
+            ax4.set_ylabel('Epsilon (%)', color='orange')
+            ax4.plot(epsilon_values, label='Epsilon', color='orange', linestyle='--')
+            ax4.set_ylim(0, 100)
+            ax4.tick_params(axis='y', labelcolor='orange')
+
+    # Annotations des dernières valeurs
+    if len(scores) > 0:
+        ax1.text(len(scores)-1, scores[-1], f"{scores[-1]:.2f}", color="blue")
+    if len(mean_scores) > 0:
+        ax1.text(len(mean_scores)-1, mean_scores[-1], f"{mean_scores[-1]:.2f}", color="orange")
+    if len(moving_avg) > 0:
+        ax1.text(len(moving_avg) + window_size - 2, moving_avg[-1], f"{moving_avg[-1]:.2f}", color="green")
     if len(epsilon_values) > 0:
-        ax3 = ax1.twinx()
-        ax3.set_ylabel('Epsilon (%)', color='orange')
-        ax3.plot(epsilon_values, label='Epsilon', color='orange', linestyle='--')
-        ax3.set_ylim(0, 100)
-        ax3.tick_params(axis='y', labelcolor='orange')
+        ax1.text(len(epsilon_values)-1, epsilon_values[-1], f"{epsilon_values[-1]:.2f}", color="orange")
 
     ax1.legend(loc='upper left')
     ax1.grid(alpha=0.3)
 
-    # --- Deuxième graphique : Proportions Random/NN ---
-    ax2.set_title('Exploration vs Exploitation')
-    ax2.set_xlabel('Number of Games')
-    ax2.set_ylabel('Proportion (%)')
+    # --- Deuxième graphique : Proportions Random/NN (uniquement si learning=True) ---
+    if learning:
+        ax2.set_title('Exploration vs Exploitation')
+        ax2.set_xlabel('Number of Games')
+        ax2.set_ylabel('Proportion (%)')
 
-    # Calcul des proportions
-    total_actions = np.array(explorations) + np.array(exploitations)
-    with np.errstate(divide='ignore', invalid='ignore'):
-        random_percent = np.divide(np.array(explorations), total_actions, where=total_actions != 0) * 100
-        nn_percent = np.divide(np.array(exploitations), total_actions, where=total_actions != 0) * 100
+        # Calcul des proportions
+        total_actions = np.array(explorations) + np.array(exploitations)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            random_percent = np.divide(np.array(explorations), total_actions, where=total_actions != 0) * 100
+            nn_percent = np.divide(np.array(exploitations), total_actions, where=total_actions != 0) * 100
 
-    # Tracer les proportions
-    ax2.plot(random_percent, label='Random (%)', color='red')
-    ax2.plot(nn_percent, label='NN (%)', color='green')
-    ax2.set_ylim(0, 100)
+        # Tracer les proportions
+        ax2.plot(random_percent, label='Random (%)', color='red')
+        ax2.plot(nn_percent, label='NN (%)', color='green')
+        ax2.set_ylim(0, 100)
 
-    # Annotations des dernières proportions
-    if len(random_percent) > 0:
-        ax2.text(len(random_percent)-1, random_percent[-1], f"{random_percent[-1]:.2f}%", color="red")
-    if len(nn_percent) > 0:
-        ax2.text(len(nn_percent)-1, nn_percent[-1], f"{nn_percent[-1]:.2f}%", color="green")
+        # Annotations des dernières proportions
+        if len(random_percent) > 0:
+            ax2.text(len(random_percent)-1, random_percent[-1], f"{random_percent[-1]:.2f}%", color="red")
+        if len(nn_percent) > 0:
+            ax2.text(len(nn_percent)-1, nn_percent[-1], f"{nn_percent[-1]:.2f}%", color="green")
 
-    ax2.legend()
-    ax2.grid(alpha=0.3)
+        ax2.legend()
+        ax2.grid(alpha=0.3)
+    # else:
+    #     ax2.set_visible(False)  # Cacher l'axe si non utilisé
+
+    # --- Troisième graphique : Courbe de Loss ---
+    if learning:
+        ax3.set_title('Training Loss')
+        ax3.set_xlabel('Number of Games')
+        ax3.set_ylabel('Loss')
+
+        # Tracer la courbe de perte
+        ax3.plot(losses, label='Loss', color='purple')
+        ax3.set_ylim(ymin=0)
+
+        # Annotations des dernières valeurs
+        if len(losses) > 0:
+            ax3.text(len(losses)-1, losses[-1], f"{losses[-1]:.2f}", color="purple")
+
+        ax3.legend()
+        ax3.grid(alpha=0.3)
+    # else:
+    #     ax3.set_visible(False)
 
     # Mettre à jour la disposition et afficher
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # plt.subplots_adjust(top=0.9, bottom=0.1)  # Ajustez les valeurs selon vos besoins
     plt.pause(0.1)
+
+
 
 def find_snake_direction(liste):
     # Convertir la liste en tableau 12x12
