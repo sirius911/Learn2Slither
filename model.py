@@ -3,32 +3,24 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import os
-import numpy as np
 
 
 class Linear_QNet(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size): #building the input, hidden and output layer
+    def __init__(self, input_size, hidden_size, output_size):
+        # building the input, hidden and output layer
         super(Linear_QNet, self).__init__()
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.linear2 = nn.Linear(hidden_size, hidden_size)
-        self.linear3 = nn.Linear(hidden_size, hidden_size)
-        self.linear4 = nn.Linear(hidden_size, output_size)
-        self._initialize_weights()
-
-    def _initialize_weights(self):
-        for layer in [self.linear1, self.linear2, self.linear3, self.linear4]:
-            if isinstance(layer, nn.Linear):
-                nn.init.xavier_uniform_(layer.weight)
-                nn.init.zeros_(layer.bias)
+        self.input_layer = nn.Linear(input_size, hidden_size)
+        self.hidden_layer = nn.Linear(hidden_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        x = F.relu(self.linear1(x))
-        x = F.relu(self.linear2(x))
-        x = F.relu(self.linear3(x))
-        x = self.linear4(x)
+        x = F.relu(self.input_layer(x))
+        x = F.relu(self.hidden_layer(x))
+        x = self.output_layer(x)
         return x
 
-    def save(self, file_name='model.pth'): #saving the model
+    def save(self, file_name='model.pth'):
+        # saving the model
         model_folder_path = './model'
         if not os.path.exists(model_folder_path):
             os.makedirs(model_folder_path)
@@ -44,60 +36,53 @@ class Linear_QNet(nn.Module):
         self.load_state_dict(torch.load(file_name, weights_only=True))
         print("Ok")
 
+
 class QTrainer:
-    def __init__(self, model, lr, gamma): #initializing 
+    def __init__(self, model: Linear_QNet, lr: float, gamma: float):
         self.lr = lr
         self.gamma = gamma
         self.model = model
-        self.optimizer = optim.AdamW(model.parameters(), lr=self.lr, weight_decay=0.01)
-        # self.optimizer = optim.Adam(model.parameters(), lr=self.lr) #optimizer
-        self.criterion = nn.MSELoss() #loss function
+        self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
+        self.loss = nn.MSELoss()
 
     def train_step(self, state, action, reward, next_state, done):
-        # Convertir les données en tenseurs PyTorch
-        if not isinstance(state, np.ndarray):
-            state = np.array(state)
+        """
+        Effectue un pas d'entraînement avec les états,
+        actions, récompenses et états suivants.
+        """
+        # if len(state.shape) == 1:
+        #     state = state.unsqueeze(0)  # Assure une dimension batch
 
-        state = torch.tensor(state, dtype=torch.float)
-        if not isinstance(next_state, np.ndarray):
-            next_state = np.array(next_state)
+        # if len(action.shape) == 1:
+        #     action = action.unsqueeze(1)  # Doit être [batch_size, 1]
 
-        next_state = torch.tensor(next_state, dtype=torch.float)
-        action = torch.tensor(action, dtype=torch.long)
-        reward = torch.tensor(reward, dtype=torch.float)
-
-        if len(state.shape) == 1:
-            state = torch.unsqueeze(state, 0)
-            next_state = torch.unsqueeze(next_state, 0)
-            action = torch.unsqueeze(action, 0)
-            reward = torch.unsqueeze(reward, 0)
-            done = (done,)
-
-        # Réduction de l'impact des pénalités
-        for idx in range(len(reward)):
-            if reward[idx] < 0:
-                reward[idx] *= 0.3
-
-        # Prédictions actuelles
+        # Prédiction avec le modèle
         pred = self.model(state)
 
-        # Initialisation des cibles
-        target = pred.clone()
-        for idx in range(len(done)):
-            Q_new = reward[idx]
-            if not done[idx]:
-                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
-            
-            # Récupérer l'index de l'action
-            action_idx = action[idx].item() if action[idx].dim() == 0 else torch.argmax(action[idx]).item()
-            target[idx][action_idx] = Q_new
+        # **CORRECTION PRINCIPALE** : Vérifier si `pred.shape` est bien `[batch_size, 4]`
+        # if pred.shape[1] != 4:
+        #     raise ValueError(f"Erreur: `pred` doit avoir une taille de 4 en deuxième dimension, \
+        # mais a {pred.shape[1]}.\n"
+        #                     f"pred.shape: {pred.shape}, state.shape: {state.shape}")
 
-        # Calcul de la perte
+        # print(f"DEBUG: pred.shape = {pred.shape}, action.shape = {action.shape}")
+
+        # Sélection de la valeur Q associée à l'action
+        q_value = pred.gather(1, action).squeeze(-1)
+
+        # Calcul de la valeur cible
+        with torch.no_grad():
+            next_pred = self.model(next_state)
+            # if next_pred.shape[1] != 4:
+            #     raise ValueError(f"Erreur: `next_pred` doit avoir une taille de 4 mais a {next_pred.shape[1]}")
+
+            next_action = torch.max(next_pred, dim=1)[0]  # Max Q-value
+            next_q_value = reward + (self.gamma * next_action * (~done))
+
+        # Mise à jour du modèle
         self.optimizer.zero_grad()
-        loss = self.criterion(target, pred)
+        loss = self.loss(q_value, next_q_value)
         loss.backward()
         self.optimizer.step()
 
-        # Retourner la valeur de la perte
         return loss.item()
-

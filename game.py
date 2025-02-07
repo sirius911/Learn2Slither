@@ -2,74 +2,140 @@ import pygame
 import random
 from collections import namedtuple
 import numpy as np
-from helper import Direction, find_snake_direction
+import torch
+from directions import Direction
+from constantes import GRID_SIZE, BLOCK_SIZE, SPEED
+from constantes import reward_game_over, reward_red_apple, reward_nothing, reward_green_apple
+import colors
 
 pygame.init()
-font = pygame.font.SysFont('arial', 25)
+font = pygame.font.SysFont('arial', 18)
 
 
 Point = namedtuple('Point', 'x, y')
-
-WHITE = (255, 255, 255)
-RED = (200, 0, 0)
-GREEN = (0, 255, 0)
-BLUE1 = (0, 0, 255)
-BLUE2 = (0, 100, 255)
-BLACK = (0, 0, 0)
-
-GRID_SIZE = 10  # 10x10
-BLOCK_SIZE = 20
-SPEED = 80  # ajust the speed of the snake to your liking 
-
-reward_green_apple = 800
-reward_red_apple = -300
-reward_nothing = -2
-reward_game_over = -500
 
 
 class SnakeGameAI:
     def __init__(self, verbose=False, graphique=True, back_function=None):
         self.w = GRID_SIZE * BLOCK_SIZE
         self.h = GRID_SIZE * BLOCK_SIZE
-        self.reset()
+        self.w_window = (GRID_SIZE + 2) * BLOCK_SIZE
+        self.h_window = (GRID_SIZE + 2) * BLOCK_SIZE
         self.verbose = verbose
         self.graphique = graphique
         self.back_function = back_function
         self.block_size = BLOCK_SIZE
         if self.graphique:
-            self.display = pygame.display.set_mode((self.w, self.h))
+            self.display = pygame.display.set_mode((self.w_window, self.h_window))
             pygame.display.set_caption('Snake')
             self.clock = pygame.time.Clock()
+        self.best_score = 0
+        self.nb_game = 0
+        self.reset()
 
     def _update_ui(self):
-        self.display.fill(BLACK)
+        self.display.fill(colors.BLACK)
 
-        # drawing snake
-        for pt in self.snake:
-            pygame.draw.rect(self.display, BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
-            pygame.draw.rect(self.display, BLUE2, pygame.Rect(pt.x + 4, pt.y + 4, 12, 12))
+        # Dimensions de la zone jouable (sans les murs)
+        play_area_x = BLOCK_SIZE  # Décalage pour les murs
+        play_area_y = BLOCK_SIZE
+        play_area_w = GRID_SIZE * BLOCK_SIZE
+        play_area_h = GRID_SIZE * BLOCK_SIZE
 
-        # drawing apples
+        # Dessiner les murs (ajouter +BLOCK_SIZE à droite et en bas pour bien les voir)
+        # Mur haut
+        pygame.draw.rect(self.display, colors.GRAY,
+                         pygame.Rect(0, 0, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
+        # Mur bas
+        pygame.draw.rect(self.display, colors.GRAY,
+                         pygame.Rect(0, self.h + BLOCK_SIZE, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
+        # Mur gauche
+        pygame.draw.rect(self.display, colors.GRAY,
+                         pygame.Rect(0, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
+        # Mur droit
+        pygame.draw.rect(self.display, colors.GRAY,
+                         pygame.Rect(self.w + BLOCK_SIZE, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
+
+        # Dessiner la grille de jeu (cases jouables)
+        for x in range(play_area_x, play_area_x + play_area_w, BLOCK_SIZE):
+            pygame.draw.line(self.display, colors.GRAY, (x, play_area_y), (x, play_area_y + play_area_h), 1)
+        for y in range(play_area_y, play_area_y + play_area_h, BLOCK_SIZE):
+            pygame.draw.line(self.display, colors.GRAY, (play_area_x, y), (play_area_x + play_area_w, y), 1)
+
+        # Dessiner le serpent (en tenant compte du décalage des murs)
+        for i, pt in enumerate(self.snake):
+            snake_x = pt.x + BLOCK_SIZE  # Décalage pour compenser les murs
+            snake_y = pt.y + BLOCK_SIZE
+            if i == 0:  # Tête
+                self._draw_snake_head_on_surface(self.display, Point(snake_x, snake_y))
+            else:
+                pygame.draw.rect(self.display, colors.BLUE1, pygame.Rect(snake_x, snake_y, BLOCK_SIZE, BLOCK_SIZE))
+                pygame.draw.rect(self.display, colors.BLUE2, pygame.Rect(snake_x + 4, snake_y + 4, 12, 12))
+
+        # Dessiner les pommes (elles doivent aussi être décalées)
         for food in self.foods:
-            color = (0, 255, 0) if food['type'] == 'green' else (255, 0, 0)  # Vert pour les pommes vertes, rouge pour les rouges
-            pygame.draw.rect(self.display, color, pygame.Rect(food['position'].x, food['position'].y, BLOCK_SIZE, BLOCK_SIZE))
+            food_x = food['position'].x + BLOCK_SIZE
+            food_y = food['position'].y + BLOCK_SIZE
+            color = colors.GREEN if food['type'] == 'green' else colors.RED
+            pygame.draw.rect(self.display, color, pygame.Rect(food_x, food_y, BLOCK_SIZE, BLOCK_SIZE))
 
-        # print score
-        text = font.render("Score: " + str(round(self.score, 3)), True, WHITE)
-        self.display.blit(text, [0, 0])
+        # Afficher le score
+        text_score = font.render(f"Score: {round(self.score, 3)}", True, colors.WHITE)
+        self.display.blit(text_score, (self.w_window - text_score.get_width(), 0))
+
+        # afficher numero game:
+        text_nb_game = font.render(f"Game # {self.nb_game + 1}", True, colors.WHITE)
+        self.display.blit(text_nb_game, [0, 0])
+
+        # afficher best score
+        text_best_score = font.render(f"Best score : {self.best_score}", True, colors.WHITE)
+        self.display.blit(text_best_score, [0, self.h_window - text_best_score.get_height()])
         pygame.display.flip()
 
     def reset(self):
-        # game state
-        self.direction = Direction.RIGHT
-        self.head = Point(self.w / 2, self.h / 2)
-        self.snake = [self.head,
-                      Point(self.head.x - BLOCK_SIZE, self.head.y),
-                      Point(self.head.x - (2 * BLOCK_SIZE), self.head.y)]
+        # Placer le serpent
+        self._place_snake()
         self.score = 0
         self.food = []
         self._place_initial_food()
         self.frame_iteration = 0
+        if self.graphique:
+            self._update_ui()
+
+    def _place_snake(self):
+        # Choisir une orientation aléatoire : horizontal ou vertical
+        horizontal = random.choice([True, False])
+
+        # Générer une position aléatoire pour la tête
+        if horizontal:
+            head_x = random.randint(2, GRID_SIZE - 3) * BLOCK_SIZE  # Assure 2 cases à gauche et à droite
+            head_y = random.randint(0, GRID_SIZE - 1) * BLOCK_SIZE  # Toute la hauteur
+            self.direction = random.choice([Direction.LEFT, Direction.RIGHT])
+        else:
+            head_x = random.randint(0, GRID_SIZE - 1) * BLOCK_SIZE  # Toute la largeur
+            head_y = random.randint(2, GRID_SIZE - 3) * BLOCK_SIZE  # Assure 2 cases en haut et en bas
+            self.direction = random.choice([Direction.UP, Direction.DOWN])
+
+        # Positionner la tête
+        self.head = Point(head_x, head_y)
+
+        # Positionner les deux segments suivants en fonction de la direction
+        if self.direction == Direction.RIGHT:
+            self.snake = [self.head,
+                          Point(self.head.x - BLOCK_SIZE, self.head.y),
+                          Point(self.head.x - 2 * BLOCK_SIZE, self.head.y)]
+        elif self.direction == Direction.LEFT:
+            self.snake = [self.head,
+                          Point(self.head.x + BLOCK_SIZE, self.head.y),
+                          Point(self.head.x + 2 * BLOCK_SIZE, self.head.y)]
+        elif self.direction == Direction.DOWN:
+            self.snake = [self.head,
+                          Point(self.head.x, self.head.y - BLOCK_SIZE),
+                          Point(self.head.x, self.head.y - 2 * BLOCK_SIZE)]
+        elif self.direction == Direction.UP:
+            self.snake = [self.head,
+                          Point(self.head.x, self.head.y + BLOCK_SIZE),
+                          Point(self.head.x, self.head.y + 2 * BLOCK_SIZE)]
 
     def _place_initial_food(self):
         self.foods = []
@@ -87,7 +153,7 @@ class SnakeGameAI:
             y = random.randint(0, (self.h - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE
             position = Point(x, y)
         return position
-    
+
     def _place_food(self):
         x = random.randint(0, (self.w - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE
         y = random.randint(0, (self.h - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE
@@ -108,7 +174,7 @@ class SnakeGameAI:
             return True  # if snake hits itself
         return False
 
-    def play_step(self, action, step=False):
+    def play_step(self, action: "Direction"):
         reward = 0
         self.frame_iteration += 1
         for event in pygame.event.get():
@@ -119,7 +185,7 @@ class SnakeGameAI:
                 quit()
 
         # Move Snake
-        self._move(action, step)
+        self._move(action)
         self.snake.insert(0, self.head)
 
         # control collisions
@@ -128,7 +194,7 @@ class SnakeGameAI:
             game_over = True
             reward = reward_game_over
             return reward, game_over, self.score
-        
+
         # controle eating apple
         eaten_food = next((food for food in self.foods if food['position'] == self.head), None)
         if eaten_food:
@@ -151,45 +217,46 @@ class SnakeGameAI:
             eaten_food['position'] = self._get_random_position()
 
         else:
-            # if no eating apple, pop the queue
             reward = reward_nothing
-            self.snake.pop()
-
-        # Afficher la vision directionnelle
-        if step:
-            self.print_snake_vision()
-            input("Tap ENTER")
+        # if no eating apple, pop the queue
+        self.snake.pop()
 
         if self.graphique:
             # Mettre à jour l'interface utilisateur
             self._update_ui()
             self.clock.tick(SPEED)
+
         if self.score < 0:
             self.score = 0
         return reward, game_over, self.score
-    
-    def _move(self, action, step):
-        directions = [Direction.UP, Direction.LEFT, Direction.DOWN, Direction.RIGHT]
-        self.direction = directions[action.index(1)]  # Map the action to the correct direction
 
+    def wait(self):
+        # 3. Gérer la pause sans bloquer la fenêtre
+        waiting = True
+        print("Appuyez sur ENTER pour continuer...")
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:  # Vérifie si ENTER est pressé
+                        waiting = False
+            # Limiter l'utilisation CPU en attendant
+            pygame.time.wait(100)
+
+    def _move(self, action):
+        self.direction = action
         x = self.head.x
         y = self.head.y
         if self.direction == Direction.RIGHT:
             x += BLOCK_SIZE
-            if step:
-                print("RIGHT")
         elif self.direction == Direction.LEFT:
             x -= BLOCK_SIZE
-            if step:
-                print("LEFT")
         elif self.direction == Direction.DOWN:
             y += BLOCK_SIZE
-            if step:
-                print("DOWN")
         elif self.direction == Direction.UP:
             y -= BLOCK_SIZE
-            if step:
-                print("UP")
         self.head = Point(x, y)
 
     def get_snake_aligned_vision(self):
@@ -270,7 +337,7 @@ class SnakeGameAI:
     def calculate_distances(self):
         NUM_DIRECTIONS = len(Direction)  # Haut, Bas, Gauche, Droite
         FEATURES = 4  # Mur, Corps, Pomme Verte, Pomme Rouge
-        distances = np.zeros((NUM_DIRECTIONS, FEATURES), dtype=np.float32)
+        distances = np.full((NUM_DIRECTIONS, FEATURES), -1, dtype=np.int32)  # Initialisation à -1
 
         # Position de la tête
         head_position = self.head
@@ -292,63 +359,204 @@ class SnakeGameAI:
                     distances[direction_id, 0] = distance  # Distance au mur
                     break
 
-                # Collision avec le corps du serpent
-                if Point(x, y) in self.snake:
-                    distances[direction_id, 1] = distance  # Distance au corps
+                # Collision avec le corps du serpent (première occurrence)
+                if distances[direction_id, 1] == -1 and Point(x, y) in self.snake:
+                    distances[direction_id, 1] = distance
+
+                # Collision avec une pomme verte (première occurrence)
+                if distances[direction_id, 2] == -1 and \
+                   any(food['position'] == Point(x, y) and food['type'] == 'green' for food in self.foods):
+                    distances[direction_id, 2] = distance
+
+                # Collision avec une pomme rouge (première occurrence)
+                if distances[direction_id, 3] == -1 and\
+                   any(food['position'] == Point(x, y) and food['type'] == 'red' for food in self.foods):
+                    distances[direction_id, 3] = distance
+
+                # Si toutes les caractéristiques ont été trouvées, on peut arrêter
+                if all(distances[direction_id, :] != -1):
                     break
 
-                # Collision avec une pomme verte
-                if any(food['position'] == Point(x, y) and food['type'] == 'green' for food in self.foods):
-                    distances[direction_id, 2] = distance  # Distance à une pomme verte
-                    break
+        # print(f"Distances calculées : {distances}")
+        return distances.tolist()  # Retourne une liste de listes
 
-                # Collision avec une pomme rouge
-                if any(food['position'] == Point(x, y) and food['type'] == 'red' for food in self.foods):
-                    distances[direction_id, 3] = distance  # Distance à une pomme rouge
-                    break
+    def is_apple_in_direction(self, direction, color="green"):
+        """
+        Vérifie s'il y a une pomme verte dans une direction donnée à partir de la tête du serpent.
+        :param direction: Une direction (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT)
+        :return: True s'il y a une pomme verte dans la direction, sinon False
+        """
+        # Obtenir la position de la tête du serpent
+        head_x, head_y = self.head.x, self.head.y
 
-        return distances.flatten()
+        # Obtenir le vecteur de déplacement pour la direction
+        dx, dy = direction.vector
 
+        # Parcourir la grille dans la direction donnée
+        x, y = head_x, head_y
+        while 0 <= x < self.w and 0 <= y < self.h:  # Tant que l'on reste dans les limites
+            x += dx * self.block_size
+            y += dy * self.block_size
 
-    # def calculate_distances(self):
-    #     NUM_DIRECTIONS = 4  # Haut, Bas, Gauche, Droite
-    #     FEATURES = 4  # Mur, Corps, Pomme Verte, Pomme Rouge
-    #     distances = np.zeros((NUM_DIRECTIONS, FEATURES), dtype=np.float32)
+            # Vérifier s'il y a une pomme verte à cette position
+            for food in self.foods:
+                if food['type'] == color and food['position'] == Point(x, y):
+                    return True  # Pomme verte trouvée
 
-    #     # Position de la tête
-    #     head_position = self.head
+        return False  # Pas de pomme verte trouvée
 
-    #     for direction in MoveTo:
-    #         id = direction.id
-    #         id = direction.value
-    #         dy, dx = direction.direction
+    def save_map(self, filename="map.png"):
+        """
+        Sauvegarde l'image actuelle de la carte (avec le serpent, les pommes, etc.) dans un fichier,
+        même si le mode graphique est désactivé.
+        :param filename: Nom du fichier pour l'image (par défaut 'map.png').
+        """
+        # Si le mode graphique est activé, utilise la surface existante
+        if self.graphique:
+            self._update_ui()
+            pygame.image.save(self.display, filename)
+        else:
+            # Crée une surface temporaire pour dessiner la carte
+            temp_display = pygame.Surface((self.w, self.h))
+            temp_display.fill(colors.BLACK)
 
-    #         y, x = head_position.y, head_position.x
-    #         distance = 0
+            # Dessiner le quadrillage
+            for x in range(0, self.w, BLOCK_SIZE):
+                pygame.draw.line(temp_display, colors.WHITE, (x, 0), (x, self.h), 1)  # Lignes verticales
+            for y in range(0, self.h, BLOCK_SIZE):
+                pygame.draw.line(temp_display, colors.WHITE, (0, y), (self.w, y), 1)  # Lignes horizontales
 
-    #         while 0 <= y < self.h and 0 <= x < self.w:
-    #             y += dy * BLOCK_SIZE
-    #             x += dx * BLOCK_SIZE
-    #             distance += 1
+            # Dessiner le serpent
+            for i, pt in enumerate(self.snake):
+                if i == 0:  # La tête du serpent
+                    self._draw_snake_head_on_surface(temp_display, pt)
+                else:  # Le reste du corps
+                    pygame.draw.rect(temp_display, colors.BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
+                    pygame.draw.rect(temp_display, colors.BLUE2, pygame.Rect(pt.x + 4, pt.y + 4, 12, 12))
 
-    #             # Collision avec un mur
-    #             if x < 0 or x >= self.w or y < 0 or y >= self.h:
-    #                 distances[id, 0] = distance  # Distance au mur
-    #                 break
+            # Dessiner les pommes
+            for food in self.foods:
+                # Vert pour les pommes vertes, rouge pour les rouges
+                color = (0, 255, 0) if food['type'] == 'green' \
+                                    else (255, 0, 0)
+                pygame.draw.rect(temp_display,
+                                 color,
+                                 pygame.Rect(food['position'].x,
+                                             food['position'].y,
+                                             BLOCK_SIZE, BLOCK_SIZE))
 
-    #             # Collision avec le corps du serpent
-    #             if Point(x, y) in self.snake:
-    #                 distances[id, 1] = distance  # Distance au corps
-    #                 break
+            # Sauvegarder la surface temporaire
+            pygame.image.save(temp_display, filename)
+        if self.verbose:
+            print(f"Carte sauvegardée sous le nom : {filename}")
 
-    #             # Collision avec une pomme verte
-    #             if any(food['position'] == Point(x, y) and food['type'] == 'green' for food in self.foods):
-    #                 distances[id, 2] = distance  # Distance à une pomme verte
-    #                 break
+    def _draw_snake_head_on_surface(self, surface, head_position):
+        """Dessine la tête du serpent sous forme de triangle orienté sur une surface spécifique."""
+        if self.direction == Direction.UP:
+            # Sommet
+            points = [(head_position.x + BLOCK_SIZE // 2, head_position.y),
+                      (head_position.x, head_position.y + BLOCK_SIZE),
+                      (head_position.x + BLOCK_SIZE, head_position.y + BLOCK_SIZE)]
+        elif self.direction == Direction.DOWN:
+            points = [(head_position.x + BLOCK_SIZE // 2, head_position.y + BLOCK_SIZE),
+                      (head_position.x, head_position.y),
+                      (head_position.x + BLOCK_SIZE, head_position.y)]
+        elif self.direction == Direction.LEFT:
+            points = [(head_position.x, head_position.y + BLOCK_SIZE // 2),  # Sommet
+                      (head_position.x + BLOCK_SIZE, head_position.y),       # Haut droit
+                      (head_position.x + BLOCK_SIZE, head_position.y + BLOCK_SIZE)]  # Bas droit
+        elif self.direction == Direction.RIGHT:
+            points = [(head_position.x + BLOCK_SIZE, head_position.y + BLOCK_SIZE // 2),  # Sommet
+                      (head_position.x, head_position.y),                               # Haut gauche
+                      (head_position.x, head_position.y + BLOCK_SIZE)]                  # Bas gauche
 
-    #             # Collision avec une pomme rouge
-    #             if any(food['position'] == Point(x, y) and food['type'] == 'red' for food in self.foods):
-    #                 distances[id, 3] = distance  # Distance à une pomme rouge
-    #                 break
+        # Dessiner le triangle représentant la tête
+        pygame.draw.polygon(surface, colors.RED, points)
 
-    #     return distances.flatten()
+    def get_state(self):
+        """
+        Retourne un tenseur PyTorch correctement formaté :
+        - Forme correcte: `[1, 16]`
+        - Type `torch.float32`
+        """
+        # Liste des directions (UP, LEFT, DOWN, RIGHT)
+        directions = [Direction.UP, Direction.LEFT, Direction.DOWN, Direction.RIGHT]
+
+        # Construire la liste des états
+        state_list = []
+        for direction in directions:
+            state_list.extend([
+                self._wall_distance(self.head.x, self.head.y, direction),
+                self._danger_distance(self.head.x, self.head.y, direction),
+                self._apple_distance(self.head.x, self.head.y, "green", direction),
+                self._apple_distance(self.head.x, self.head.y, "red", direction)
+            ])
+
+        # Convertir en tenseur PyTorch avec la bonne forme
+        state_tensor = torch.tensor(state_list, dtype=torch.float32).unsqueeze(0)
+
+        # print(f"DEBUG: get_state() retourne un tensor de forme {state_tensor.shape}")
+
+        return state_tensor  # Renvoie un `[1, 16]`
+
+    def _wall_distance(self, x, y, direction):
+        """
+        Retourne la distance normalisée entre la tête du serpent et le mur dans la direction donnée.
+        """
+        distance = 0
+        dx, dy = direction.vector
+        while 0 <= x < self.w and 0 <= y < self.h:
+            x += dx * self.block_size
+            y += dy * self.block_size
+            distance += 1
+
+        return self._normalize(distance)
+
+    def _danger_distance(self, x, y, direction):
+        """
+        Retourne la distance entre la tête du serpent
+        et un danger (mur, corps,
+        ou pomme rouge si la taille du serpent est 1).
+        """
+        distance = 0
+        dx, dy = direction.vector
+        no_snake_body = len(self.snake) == 1  # True si le serpent est de taille 1
+
+        while 0 <= x < self.w and 0 <= y < self.h:
+            x += dx * self.block_size
+            y += dy * self.block_size
+            distance += 1
+
+            # Collision avec un mur
+            if x < 0 or x >= self.w or y < 0 or y >= self.h:
+                return self._normalize(distance)  # Distance normalisée
+
+            # Collision avec le corps du serpent
+            if Point(x, y) in self.snake:
+                return self._normalize(distance)
+
+            # Si le serpent est de taille 1, considérer les pommes rouges comme danger
+            if no_snake_body and any(food['position'] == Point(x, y) and food['type'] == "red" for food in self.foods):
+                return self._normalize(distance)
+
+        return 1.0  # Aucune collision détectée
+
+    def _apple_distance(self, x, y, apple_type, direction):
+        """
+        Retourne la distance entre la tête du serpent et la pomme de type spécifié dans la direction donnée.
+        """
+        distance = 0
+        dx, dy = direction.vector
+        while 0 <= x < self.w and 0 <= y < self.h:
+            x += dx * self.block_size
+            y += dy * self.block_size
+            distance += 1
+            if any(food['position'] == Point(x, y) and food['type'] == apple_type for food in self.foods):
+                return self._normalize(distance)
+        return 1.0  # Aucune pomme trouvée
+
+    def _normalize(self, distance):
+        """
+        Normalise une distance en la divisant par la plus grande distance possible.
+        """
+        return distance / (GRID_SIZE - 1)
