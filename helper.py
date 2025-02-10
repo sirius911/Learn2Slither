@@ -1,7 +1,9 @@
 import math
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from directions import Direction
+import pandas as pd
 
 plt.ion()
 
@@ -87,34 +89,42 @@ def plot(scores, mean_scores, epsilon_values, learning):
     plt.pause(0.1)
 
 
-def find_snake_direction(liste):
-    # Convertir la liste en tableau 12x12
-    tableau = np.array(liste).reshape(12, 12)
+def print_tensor(tensor: torch.Tensor):
+    index = [dir.name for dir in Direction.directions()]
+    df = pd.DataFrame(tensor.numpy().reshape(4, 4),
+                      index=index,
+                      columns=["Wall", "Danger", "Apple_Green", "Apple_Red"])
+    print(df)
 
-    # Trouver les positions de la tête (valeur 2) et des queues (valeur 3)
-    head_pos = np.argwhere(tableau == 2)
-    tail_pos = np.argwhere(tableau == 3)
 
-    if len(head_pos) == 0 or len(tail_pos) == 0:
-        raise ValueError("Le tableau ne contient pas de tête (2) ou de queue (3).")
+# def find_snake_direction(liste):
+#     # Convertir la liste en tableau 12x12
+#     tableau = np.array(liste).reshape(12, 12)
 
-    # La tête et la queue sont des tableaux avec une seule position
-    head_pos = head_pos[0]  # Exemple : [i, j] pour la tête
-    tail_pos = tail_pos[0]  # Exemple : [i, j] pour la queue
+#     # Trouver les positions de la tête (valeur 2) et des queues (valeur 3)
+#     head_pos = np.argwhere(tableau == 2)
+#     tail_pos = np.argwhere(tableau == 3)
 
-    # Calculer la direction en fonction des coordonnées
-    if head_pos[0] == tail_pos[0]:  # Même ligne
-        if head_pos[1] < tail_pos[1]:
-            return Direction.LEFT
-        else:
-            return Direction.RIGHT
-    elif head_pos[1] == tail_pos[1]:  # Même colonne
-        if head_pos[0] < tail_pos[0]:
-            return Direction.UP
-        else:
-            return Direction.DOWN
-    else:
-        raise ValueError("La tête et la queue ne sont pas alignées correctement")
+#     if len(head_pos) == 0 or len(tail_pos) == 0:
+#         raise ValueError("Le tableau ne contient pas de tête (2) ou de queue (3).")
+
+#     # La tête et la queue sont des tableaux avec une seule position
+#     head_pos = head_pos[0]  # Exemple : [i, j] pour la tête
+#     tail_pos = tail_pos[0]  # Exemple : [i, j] pour la queue
+
+#     # Calculer la direction en fonction des coordonnées
+#     if head_pos[0] == tail_pos[0]:  # Même ligne
+#         if head_pos[1] < tail_pos[1]:
+#             return Direction.LEFT
+#         else:
+#             return Direction.RIGHT
+#     elif head_pos[1] == tail_pos[1]:  # Même colonne
+#         if head_pos[0] < tail_pos[0]:
+#             return Direction.UP
+#         else:
+#             return Direction.DOWN
+#     else:
+#         raise ValueError("La tête et la queue ne sont pas alignées correctement")
 
 
 def calc_epsilon(n_games):

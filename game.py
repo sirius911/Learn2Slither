@@ -33,8 +33,12 @@ class SnakeGameAI:
         self.nb_game = 0
         self.reset()
 
-    def _update_ui(self):
-        self.display.fill(colors.BLACK)
+    def _update_ui(self, temp_surface=None):
+        if temp_surface is None:
+            surface = self.display
+        else:
+            surface = temp_surface
+        surface.fill(colors.BLACK)
 
         # Dimensions de la zone jouable (sans les murs)
         play_area_x = BLOCK_SIZE  # Décalage pour les murs
@@ -44,53 +48,60 @@ class SnakeGameAI:
 
         # Dessiner les murs (ajouter +BLOCK_SIZE à droite et en bas pour bien les voir)
         # Mur haut
-        pygame.draw.rect(self.display, colors.GRAY,
+        pygame.draw.rect(surface, colors.GRAY,
                          pygame.Rect(0, 0, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
         # Mur bas
-        pygame.draw.rect(self.display, colors.GRAY,
+        pygame.draw.rect(surface, colors.GRAY,
                          pygame.Rect(0, self.h + BLOCK_SIZE, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
         # Mur gauche
-        pygame.draw.rect(self.display, colors.GRAY,
+        pygame.draw.rect(surface, colors.GRAY,
                          pygame.Rect(0, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
         # Mur droit
-        pygame.draw.rect(self.display, colors.GRAY,
+        pygame.draw.rect(surface, colors.GRAY,
                          pygame.Rect(self.w + BLOCK_SIZE, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
 
         # Dessiner la grille de jeu (cases jouables)
         for x in range(play_area_x, play_area_x + play_area_w, BLOCK_SIZE):
-            pygame.draw.line(self.display, colors.GRAY, (x, play_area_y), (x, play_area_y + play_area_h), 1)
+            pygame.draw.line(surface, colors.GRAY, (x, play_area_y), (x, play_area_y + play_area_h), 1)
         for y in range(play_area_y, play_area_y + play_area_h, BLOCK_SIZE):
-            pygame.draw.line(self.display, colors.GRAY, (play_area_x, y), (play_area_x + play_area_w, y), 1)
+            pygame.draw.line(surface, colors.GRAY, (play_area_x, y), (play_area_x + play_area_w, y), 1)
 
         # Dessiner le serpent (en tenant compte du décalage des murs)
-        for i, pt in enumerate(self.snake):
+        for i, pt in enumerate(self.snake[1:]):
             snake_x = pt.x + BLOCK_SIZE  # Décalage pour compenser les murs
             snake_y = pt.y + BLOCK_SIZE
-            if i == 0:  # Tête
-                self._draw_snake_head_on_surface(self.display, Point(snake_x, snake_y))
-            else:
-                pygame.draw.rect(self.display, colors.BLUE1, pygame.Rect(snake_x, snake_y, BLOCK_SIZE, BLOCK_SIZE))
-                pygame.draw.rect(self.display, colors.BLUE2, pygame.Rect(snake_x + 4, snake_y + 4, 12, 12))
-
+            # if i == 0:  # Tête
+            #     self._draw_snake_head_on_surface(surface, Point(snake_x, snake_y))
+            # else:
+            pygame.draw.rect(surface, colors.BLUE1, pygame.Rect(snake_x, snake_y, BLOCK_SIZE, BLOCK_SIZE))
+            pygame.draw.rect(surface, colors.BLUE2, pygame.Rect(snake_x + 4, snake_y + 4, 12, 12))
+        # dessine tete:
+        snake_x = self.snake[0].x + BLOCK_SIZE
+        snake_y = self.snake[0].y + BLOCK_SIZE
+        self._draw_snake_head_on_surface(surface, Point(snake_x, snake_y))
         # Dessiner les pommes (elles doivent aussi être décalées)
         for food in self.foods:
             food_x = food['position'].x + BLOCK_SIZE
             food_y = food['position'].y + BLOCK_SIZE
             color = colors.GREEN if food['type'] == 'green' else colors.RED
-            pygame.draw.rect(self.display, color, pygame.Rect(food_x, food_y, BLOCK_SIZE, BLOCK_SIZE))
+            pygame.draw.rect(surface, color, pygame.Rect(food_x, food_y, BLOCK_SIZE, BLOCK_SIZE))
 
         # Afficher le score
         text_score = font.render(f"Score: {round(self.score, 3)}", True, colors.WHITE)
-        self.display.blit(text_score, (self.w_window - text_score.get_width(), 0))
+        surface.blit(text_score, (self.w_window - text_score.get_width(), 0))
 
         # afficher numero game:
         text_nb_game = font.render(f"Game # {self.nb_game + 1}", True, colors.WHITE)
-        self.display.blit(text_nb_game, [0, 0])
+        surface.blit(text_nb_game, [0, 0])
 
         # afficher best score
         text_best_score = font.render(f"Best score : {self.best_score}", True, colors.WHITE)
-        self.display.blit(text_best_score, [0, self.h_window - text_best_score.get_height()])
-        pygame.display.flip()
+        surface.blit(text_best_score, [0, self.h_window - text_best_score.get_height()])
+        if temp_surface is None:
+            self.surface = surface
+            pygame.display.flip()
+
+        return surface
 
     def reset(self):
         # Placer le serpent
@@ -417,33 +428,55 @@ class SnakeGameAI:
             pygame.image.save(self.display, filename)
         else:
             # Crée une surface temporaire pour dessiner la carte
-            temp_display = pygame.Surface((self.w, self.h))
-            temp_display.fill(colors.BLACK)
+            temp_display = pygame.Surface((self.w_window, self.h_window))
+            temp_display = self._update_ui(temp_display)
+            # temp_display.fill(colors.BLACK)
 
-            # Dessiner le quadrillage
-            for x in range(0, self.w, BLOCK_SIZE):
-                pygame.draw.line(temp_display, colors.WHITE, (x, 0), (x, self.h), 1)  # Lignes verticales
-            for y in range(0, self.h, BLOCK_SIZE):
-                pygame.draw.line(temp_display, colors.WHITE, (0, y), (self.w, y), 1)  # Lignes horizontales
+            # # Dimensions de la zone jouable (sans les murs)
+            # play_area_x = BLOCK_SIZE  # Décalage pour les murs
+            # play_area_y = BLOCK_SIZE
+            # play_area_w = GRID_SIZE * BLOCK_SIZE
+            # play_area_h = GRID_SIZE * BLOCK_SIZE
 
-            # Dessiner le serpent
-            for i, pt in enumerate(self.snake):
-                if i == 0:  # La tête du serpent
-                    self._draw_snake_head_on_surface(temp_display, pt)
-                else:  # Le reste du corps
-                    pygame.draw.rect(temp_display, colors.BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
-                    pygame.draw.rect(temp_display, colors.BLUE2, pygame.Rect(pt.x + 4, pt.y + 4, 12, 12))
+            # # Dessiner les murs (ajouter +BLOCK_SIZE à droite et en bas pour bien les voir)
+            # # Mur haut
+            # pygame.draw.rect(self.display, colors.GRAY,
+            #                 pygame.Rect(0, 0, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
+            # # Mur bas
+            # pygame.draw.rect(self.display, colors.GRAY,
+            #                 pygame.Rect(0, self.h + BLOCK_SIZE, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
+            # # Mur gauche
+            # pygame.draw.rect(self.display, colors.GRAY,
+            #                 pygame.Rect(0, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
+            # # Mur droit
+            # pygame.draw.rect(self.display, colors.GRAY,
+            #                 pygame.Rect(self.w + BLOCK_SIZE, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
 
-            # Dessiner les pommes
-            for food in self.foods:
-                # Vert pour les pommes vertes, rouge pour les rouges
-                color = (0, 255, 0) if food['type'] == 'green' \
-                                    else (255, 0, 0)
-                pygame.draw.rect(temp_display,
-                                 color,
-                                 pygame.Rect(food['position'].x,
-                                             food['position'].y,
-                                             BLOCK_SIZE, BLOCK_SIZE))
+
+            # # Dessiner le quadrillage
+            # for x in range(0, self.w, BLOCK_SIZE):
+            #     pygame.draw.line(temp_display, colors.WHITE, (x, 0), (x, self.h), 1)  # Lignes verticales
+            # for y in range(0, self.h, BLOCK_SIZE):
+            #     pygame.draw.line(temp_display, colors.WHITE, (0, y), (self.w, y), 1)  # Lignes horizontales
+
+            # # Dessiner le serpent
+            # for i, pt in enumerate(self.snake):
+            #     if i == 0:  # La tête du serpent
+            #         self._draw_snake_head_on_surface(temp_display, pt)
+            #     else:  # Le reste du corps
+            #         pygame.draw.rect(temp_display, colors.BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
+            #         pygame.draw.rect(temp_display, colors.BLUE2, pygame.Rect(pt.x + 4, pt.y + 4, 12, 12))
+
+            # # Dessiner les pommes
+            # for food in self.foods:
+            #     # Vert pour les pommes vertes, rouge pour les rouges
+            #     color = (0, 255, 0) if food['type'] == 'green' \
+            #                         else (255, 0, 0)
+            #     pygame.draw.rect(temp_display,
+            #                      color,
+            #                      pygame.Rect(food['position'].x,
+            #                                  food['position'].y,
+            #                                  BLOCK_SIZE, BLOCK_SIZE))
 
             # Sauvegarder la surface temporaire
             pygame.image.save(temp_display, filename)

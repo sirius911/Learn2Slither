@@ -1,6 +1,6 @@
 from game import SnakeGameAI
 from Agent import Agent
-from helper import plot
+from helper import plot, print_tensor
 from directions import Direction
 import matplotlib.pyplot as plt
 import argparse
@@ -36,6 +36,7 @@ def play(agent=None, learning=True,
             state_old = game.get_state()
             if step:
                 game.print_snake_vision()
+                print_tensor(state_old)
             move: int = agent.get_action(state=state_old, learning=learning)
             absolute_move = Direction.directions()[move]
             direction_move = Direction.relative_direction(game.direction, absolute_move)
@@ -82,7 +83,7 @@ def play(agent=None, learning=True,
         if graphique and learning and not step:
             plot(plot_scores, plot_mean_scores,
                  epsilon_values, learning)
-    print(f"number of games : {agent.n_games}, Best score = {record}, Max duration : {max_duration}")
+    print(f"number of games : {agent.n_games}, Best score = {record}, Max duration : {max_duration} mean score = {total_score/agent.n_games:0.2f}")
     if not graphique or not learning:
         plot(plot_scores, plot_mean_scores,
              epsilon_values, learning)

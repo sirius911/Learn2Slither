@@ -38,11 +38,13 @@ class Agent:
         )
 
     def train_short_memory(self, state, action, reward, next_state, done):
+        if not isinstance(next_state, torch.Tensor):
+            next_state = torch.tensor(state, dtype=torch.float)
         self.trainer.train_step(
             state,
             torch.tensor(action, dtype=torch.long).view(-1, 1),
             torch.tensor([reward], dtype=torch.float),
-            torch.tensor(next_state, dtype=torch.float),
+            next_state,
             torch.tensor([done], dtype=torch.bool)
         )
 
