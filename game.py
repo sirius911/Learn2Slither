@@ -1,11 +1,12 @@
 import pygame
 import random
-from collections import namedtuple
+from collections import deque, namedtuple
 import numpy as np
 import torch
 from directions import Direction
 from constantes import GRID_SIZE, BLOCK_SIZE, SPEED
-from constantes import reward_game_over, reward_red_apple, reward_nothing, reward_green_apple
+from constantes import reward_game_over, reward_red_apple, reward_nothing
+from constantes import reward_green_apple, reward_infini_boucle
 import colors
 
 pygame.init()
@@ -31,6 +32,8 @@ class SnakeGameAI:
             self.clock = pygame.time.Clock()
         self.best_score = 0
         self.nb_game = 0
+        self.nb_infini = 0
+        self.recent_paths = deque(maxlen=100)  # Stocke les 100 derniers états du serpent
         self.reset()
 
     def _update_ui(self, temp_surface=None):
@@ -110,6 +113,7 @@ class SnakeGameAI:
         self.food = []
         self._place_initial_food()
         self.frame_iteration = 0
+        self.recent_paths = []
         if self.graphique:
             self._update_ui()
 
@@ -185,9 +189,10 @@ class SnakeGameAI:
             return True  # if snake hits itself
         return False
 
-    def play_step(self, action: "Direction"):
+    def play_step(self, action: "Direction", verbose:bool=False):
         reward = 0
         self.frame_iteration += 1
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 if self.back_function is not None:
@@ -198,6 +203,19 @@ class SnakeGameAI:
         # Move Snake
         self._move(action)
         self.snake.insert(0, self.head)
+
+        # **Mémorisation du chemin récent**
+        # Copie de la liste du serpent sous forme de tuple immuable
+        current_path = tuple(self.snake[:])
+        self.recent_paths.append(current_path)
+        # print(f"recent_path = {self.recent_paths}\n")
+
+        # **Détection de boucle infinie**
+        if self.detect_loop():
+            if verbose:
+                print("🚨 Boucle infinie détectée ! 🚨")
+            reward = reward_infini_boucle
+            return reward, True, self.score
 
         # control collisions
         game_over = False
@@ -226,7 +244,7 @@ class SnakeGameAI:
 
             # Remplace la pomme mangée
             eaten_food['position'] = self._get_random_position()
-
+            self.recent_paths = []
         else:
             reward = reward_nothing
         # if no eating apple, pop the queue
@@ -255,6 +273,28 @@ class SnakeGameAI:
                         waiting = False
             # Limiter l'utilisation CPU en attendant
             pygame.time.wait(100)
+
+    def detect_loop(self, loop_threshold=4):
+        """
+        Détecte si le serpent boucle en répétant exactement le même chemin.
+        Si une même séquence de positions se répète plusieurs fois, on considère que c'est une boucle infinie.
+
+        loop_threshold : Nombre de répétitions nécessaires pour considérer que c'est une boucle.
+        """
+        # On mémorise seulement les N derniers mouvements (correspondant à la longueur du serpent)
+        recent_moves = self.recent_paths[-len(self.snake):]
+
+        # On compte combien de fois cette séquence s'est répétée dans `recent_path`
+        count = sum(1 for i in range(len(self.recent_paths) - len(recent_moves) + 1)
+                    if self.recent_paths[i:i+len(recent_moves)] == recent_moves)
+
+        if count >= loop_threshold:
+            self.nb_infini += 1
+            return True
+
+        return False
+
+
 
     def _move(self, action):
         self.direction = action

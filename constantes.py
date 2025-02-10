@@ -14,3 +14,4 @@ reward_green_apple = 800
 reward_red_apple = -300
 reward_nothing = -2
 reward_game_over = -500
+reward_infini_boucle = -200
