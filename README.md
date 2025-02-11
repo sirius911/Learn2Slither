@@ -8,8 +8,6 @@ Learn2Slither
 https://github.com/cmariot/Learn2Slither
 
 ### Résultats
-| Model | couches |          vue              | Nb Game | durée | Best score | Moyenne |
-| 100K2 |   4     | distance premier obstacle |  100K   |  15h  |    17      | |
-| 100K3 |   4     | Distance de ts obstacles  |  100K   |  33h  |    15      | 2.5  |
-| 100K4 |   1     |       même chose          |  100K   |  12h  |     18     | 2.34 |
-essais avec supression dans model de la réduction impacte pénalité avec gamma 0.9
+| Model | couches  |          vue               | Nb entrainement | Nb game test | durée | Best score | Moyenne | Loop |
+| best  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  753  |     63     |  18.61  | 2.9% |
+| loop  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  640  |     54     |  17.14  | 3.3% | avec détection boucles infinies

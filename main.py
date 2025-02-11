@@ -85,8 +85,9 @@ def play(agent=None, learning=True,
                      epsilon_values, learning)
     except KeyboardInterrupt:
         print("\n Interrupted by Ctrl-C")
-        agent.model.save(f'{save}_{agent.n_games}_sessions.pth')
-    finally:    
+        if learning:
+            agent.model.save(f'{save}_{agent.n_games}_sessions.pth')
+    finally:
         if agent.n_games > 0:
             mean_score = total_score / agent.n_games
         else:

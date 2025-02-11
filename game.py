@@ -189,7 +189,7 @@ class SnakeGameAI:
             return True  # if snake hits itself
         return False
 
-    def play_step(self, action: "Direction", verbose:bool=False):
+    def play_step(self, action: "Direction", verbose: bool = False):
         reward = 0
         self.frame_iteration += 1
 
@@ -293,8 +293,6 @@ class SnakeGameAI:
             return True
 
         return False
-
-
 
     def _move(self, action):
         self.direction = action
@@ -470,53 +468,6 @@ class SnakeGameAI:
             # Crée une surface temporaire pour dessiner la carte
             temp_display = pygame.Surface((self.w_window, self.h_window))
             temp_display = self._update_ui(temp_display)
-            # temp_display.fill(colors.BLACK)
-
-            # # Dimensions de la zone jouable (sans les murs)
-            # play_area_x = BLOCK_SIZE  # Décalage pour les murs
-            # play_area_y = BLOCK_SIZE
-            # play_area_w = GRID_SIZE * BLOCK_SIZE
-            # play_area_h = GRID_SIZE * BLOCK_SIZE
-
-            # # Dessiner les murs (ajouter +BLOCK_SIZE à droite et en bas pour bien les voir)
-            # # Mur haut
-            # pygame.draw.rect(self.display, colors.GRAY,
-            #                 pygame.Rect(0, 0, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
-            # # Mur bas
-            # pygame.draw.rect(self.display, colors.GRAY,
-            #                 pygame.Rect(0, self.h + BLOCK_SIZE, self.w + 2 * BLOCK_SIZE, BLOCK_SIZE))
-            # # Mur gauche
-            # pygame.draw.rect(self.display, colors.GRAY,
-            #                 pygame.Rect(0, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
-            # # Mur droit
-            # pygame.draw.rect(self.display, colors.GRAY,
-            #                 pygame.Rect(self.w + BLOCK_SIZE, 0, BLOCK_SIZE, self.h + 2 * BLOCK_SIZE))
-
-
-            # # Dessiner le quadrillage
-            # for x in range(0, self.w, BLOCK_SIZE):
-            #     pygame.draw.line(temp_display, colors.WHITE, (x, 0), (x, self.h), 1)  # Lignes verticales
-            # for y in range(0, self.h, BLOCK_SIZE):
-            #     pygame.draw.line(temp_display, colors.WHITE, (0, y), (self.w, y), 1)  # Lignes horizontales
-
-            # # Dessiner le serpent
-            # for i, pt in enumerate(self.snake):
-            #     if i == 0:  # La tête du serpent
-            #         self._draw_snake_head_on_surface(temp_display, pt)
-            #     else:  # Le reste du corps
-            #         pygame.draw.rect(temp_display, colors.BLUE1, pygame.Rect(pt.x, pt.y, BLOCK_SIZE, BLOCK_SIZE))
-            #         pygame.draw.rect(temp_display, colors.BLUE2, pygame.Rect(pt.x + 4, pt.y + 4, 12, 12))
-
-            # # Dessiner les pommes
-            # for food in self.foods:
-            #     # Vert pour les pommes vertes, rouge pour les rouges
-            #     color = (0, 255, 0) if food['type'] == 'green' \
-            #                         else (255, 0, 0)
-            #     pygame.draw.rect(temp_display,
-            #                      color,
-            #                      pygame.Rect(food['position'].x,
-            #                                  food['position'].y,
-            #                                  BLOCK_SIZE, BLOCK_SIZE))
 
             # Sauvegarder la surface temporaire
             pygame.image.save(temp_display, filename)
