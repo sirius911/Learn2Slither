@@ -62,7 +62,6 @@ class Agent:
             # print("EXPLORATION")
             self.exploration_count += 1
             choix = random.randint(1, 3)
-
             move = torch.argsort(prediction, descending=True)[choix].item()
         else:
             # print("EXPLOITATION")
