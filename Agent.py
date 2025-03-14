@@ -1,13 +1,15 @@
+import json
+import os
 import torch
 import random
 from collections import deque  # data structure to store memory
 from model import Linear_QNet, QTrainer  # importing the neural net from step 2
 from helper import calc_epsilon
-from constantes import MAX_MEMORY, GAMMA, LR
+from constantes import MAX_MEMORY, GAMMA, LR, MODEL_FOLDER_PATH
 
 
 class Agent:
-    def __init__(self):
+    def __init__(self, name="last_model"):
         self.n_games = 0
         self.epsilon = 0.1
         self.gamma = GAMMA
@@ -16,6 +18,7 @@ class Agent:
         self.exploitation_count = 0
         self.model = Linear_QNet(16, 512, 4)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
+        self.name = name
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
@@ -74,3 +77,42 @@ class Agent:
     def adjust_batch_size(self):
         # Augmente progressivement la taille du mini-lot avec le nombre de parties
         return min(128 + (self.n_games // 10), 1024)  # Limite à 1024
+
+    def save(self, filename=None):
+        if filename is None:
+            filename = f"{self.name}"
+        file_info = f"{filename}_info.json"
+        file_info = os.path.join(MODEL_FOLDER_PATH, file_info)
+
+        # Crée le dossier s'il n'existe pas
+        os.makedirs(os.path.dirname(file_info), exist_ok=True)
+
+        filename += ".pth"
+        self.model.save(file_name=filename)
+
+        # Sauvegarde des informations dans un fichier JSON
+        info = {"n_games": self.n_games}
+        with open(file_info, "w") as f:
+            json.dump(info, f)
+
+        print(f"Model saved as {filename}, info saved in {file_info}")
+
+    def load(self, filename=None):
+        if filename is None:
+            filename = self.name
+        file_info = f"{filename}_info.json"
+        file_info = os.path.join(MODEL_FOLDER_PATH, file_info)
+
+        filename += ".pth"
+
+        # Chargement du nombre de parties
+        try:
+            with open(file_info, "r") as f:
+                info = json.load(f)
+                self.n_games = info.get("n_games", 0)
+                print(f"Loaded n_games: {self.n_games} from {file_info}")
+
+        except FileNotFoundError:
+            print(f"Info file not found[{file_info}], starting with n_games = 0")
+
+        return self.model.load(filename)

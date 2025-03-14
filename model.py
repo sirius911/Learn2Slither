@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import os
+from constantes import MODEL_FOLDER_PATH
 
 
 class Linear_QNet(nn.Module):
@@ -21,20 +22,23 @@ class Linear_QNet(nn.Module):
 
     def save(self, file_name='model.pth'):
         # saving the model
-        model_folder_path = './model'
-        if not os.path.exists(model_folder_path):
-            os.makedirs(model_folder_path)
 
-        file_name = os.path.join(model_folder_path, file_name)
+        file_name = os.path.join(MODEL_FOLDER_PATH, file_name)
+
         print(f"Sauvegarde de {file_name}", end=" ... ")
         torch.save(self.state_dict(), file_name)
         print("Ok")
 
     def load(self, file_name='model.pth'):
-        file_name = os.path.join('./model', file_name)
-        print(f"Chargement de {file_name}", end=" ... ")
-        self.load_state_dict(torch.load(file_name, weights_only=True))
-        print("Ok")
+        try:
+            file_name = os.path.join(MODEL_FOLDER_PATH, file_name)
+            print(f"Chargement de {file_name}", end=" ... ")
+            self.load_state_dict(torch.load(file_name, weights_only=True))
+            print("Ok")
+            return True
+        except Exception as e:
+            print(f"ERREUR: {e}")
+            return False
 
 
 class QTrainer:
@@ -50,22 +54,9 @@ class QTrainer:
         Effectue un pas d'entraînement avec les états,
         actions, récompenses et états suivants.
         """
-        # if len(state.shape) == 1:
-        #     state = state.unsqueeze(0)  # Assure une dimension batch
-
-        # if len(action.shape) == 1:
-        #     action = action.unsqueeze(1)  # Doit être [batch_size, 1]
 
         # Prédiction avec le modèle
         pred = self.model(state)
-
-        # **CORRECTION PRINCIPALE** : Vérifier si `pred.shape` est bien `[batch_size, 4]`
-        # if pred.shape[1] != 4:
-        #     raise ValueError(f"Erreur: `pred` doit avoir une taille de 4 en deuxième dimension, \
-        # mais a {pred.shape[1]}.\n"
-        #                     f"pred.shape: {pred.shape}, state.shape: {state.shape}")
-
-        # print(f"DEBUG: pred.shape = {pred.shape}, action.shape = {action.shape}")
 
         # Sélection de la valeur Q associée à l'action
         q_value = pred.gather(1, action).squeeze(-1)
@@ -73,9 +64,6 @@ class QTrainer:
         # Calcul de la valeur cible
         with torch.no_grad():
             next_pred = self.model(next_state)
-            # if next_pred.shape[1] != 4:
-            #     raise ValueError(f"Erreur: `next_pred` doit avoir une taille de 4 mais a {next_pred.shape[1]}")
-
             next_action = torch.max(next_pred, dim=1)[0]  # Max Q-value
             next_q_value = reward + (self.gamma * next_action * (~done))
 
