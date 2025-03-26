@@ -22,3 +22,6 @@ number of games : 10000, Best score = 57,               Max duration : 584 mean 
 
 2eme Essais avec reload sur 10000 entrainements meme infinity reward qu'au dessus:
 number of games : 10000, Best score = 51,               Max duration : 467 mean score = 16.53                Nb boucle infinie : 3663
+
+Essais sur 300 000 entrainements sans reload::
+number of games : 10000, Best score = 57,               Max duration : 534 mean score = 16.43                Nb boucle infinie : 33,47%
