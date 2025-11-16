@@ -192,13 +192,13 @@ class SnakeGameAI:
     def play_step(self, action: "Direction", verbose: bool = False):
         reward = 0
         self.frame_iteration += 1
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                if self.back_function is not None:
-                    self.back_function()
-                pygame.quit()
-                quit()
+        try:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return reward, True, self.score
+        except Exception:
+            return reward_game_over, True, self.score
 
         # Move Snake
         self._move(action)
@@ -266,8 +266,11 @@ class SnakeGameAI:
         while waiting:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    # Stop waiting and return so the main loop can finish
+                    # gracefully. Avoid calling quit() which raises SystemExit.
                     pygame.quit()
-                    quit()
+                    waiting = False
+                    break
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:  # Vérifie si ENTER est pressé
                         waiting = False
@@ -372,16 +375,11 @@ class SnakeGameAI:
         return "0"
 
     def print_snake_vision(self):
-        # for y in range(-1, 11):
-        #     for x in range(-1, 11):
-        #         print(self._get_grid_content(x,y), end='')
-        #     print("")
         aligned_vision = self.get_snake_aligned_vision()
 
         # Afficher ligne par ligne
         for row in aligned_vision:
             print("".join(row))  # Joindre chaque ligne pour former une chaîne
-        print("-" * 20)  # Ligne de séparation
 
     def calculate_distances(self):
         NUM_DIRECTIONS = len(Direction)  # Haut, Bas, Gauche, Droite
@@ -471,6 +469,7 @@ class SnakeGameAI:
 
             # Sauvegarder la surface temporaire
             pygame.image.save(temp_display, filename)
+
         if self.verbose:
             print(f"Carte sauvegardée sous le nom : {filename}")
 
@@ -518,8 +517,6 @@ class SnakeGameAI:
 
         # Convertir en tenseur PyTorch avec la bonne forme
         state_tensor = torch.tensor(state_list, dtype=torch.float32).unsqueeze(0)
-
-        # print(f"DEBUG: get_state() retourne un tensor de forme {state_tensor.shape}")
 
         return state_tensor  # Renvoie un `[1, 16]`
 
@@ -583,4 +580,5 @@ class SnakeGameAI:
         """
         Normalise une distance en la divisant par la plus grande distance possible.
         """
-        return distance / (GRID_SIZE - 1)
+        return min(distance / (GRID_SIZE - 1), 1.0)
+        # return distance / (GRID_SIZE - 1)

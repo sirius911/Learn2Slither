@@ -9,11 +9,25 @@ from tqdm import tqdm
 from constantes import MODEL_FOLDER_PATH
 
 
+def my_tqdm(iterable, desc=None, total=None):
+    """Minimal tqdm-like iterator used for `--step` mode.
+    """
+    for item in iterable:
+        yield item
+
+
 def ending(agent, learning=False, save="last_model.pth"):
     if learning:
         agent.save(filename=save)
-        plt.savefig(f"./model/{save}.png")
-    print("fin du programme")
+        file_name_statistique = f"./model/{save}_stat.png"
+        print(f"sauvegarde des statistiques dans {file_name_statistique} ...", end='')
+        plt.savefig(file_name_statistique)
+        print("Ok")
+        try:
+            input("(tapez ENTER to exit)...")
+        except Exception:
+            pass
+    print("Programme terminé.")
 
 
 def play(agent=None, learning=True,
@@ -24,7 +38,12 @@ def play(agent=None, learning=True,
     plot_mean_scores = []
     epsilon_values = []
     total_score = 0
+    score = 0
     record = 0
+    if step:
+        _tqdm = my_tqdm
+    else:
+        _tqdm = tqdm
     game = SnakeGameAI(verbose=verbose,
                        graphique=graphique,
                        back_function=lambda: ending(agent, learning))
@@ -37,13 +56,20 @@ def play(agent=None, learning=True,
         agent.n_games = 0
     depart = agent.n_games
     try:
-        for _ in tqdm(range(agent.n_games, agent.n_games + sessions), desc='Training' if learning else 'gaming'):
+        # for _ in tqdm(range(agent.n_games, agent.n_games + sessions), desc='Training' if learning else 'gaming'):
+        for partie in _tqdm(iterable=range(agent.n_games, agent.n_games + sessions),
+                            desc='Training' if learning else 'gaming',
+                            total=sessions):
             done = False
             while not done:
                 state_old = game.get_state()
                 if step:
+                    print("*" * 50)  # Ligne de séparation
+                    print(f"\tgame # {partie + 1}/Turn # {current_duration + 1} - Score: {score}")
                     game.print_snake_vision()
+                    print("-" * 50)
                     print_tensor(state_old)
+                    print("-" * 50)
                 move: int = agent.get_action(state=state_old, learning=learning)
                 absolute_move = Direction.directions()[move]
                 direction_move = Direction.relative_direction(game.direction, absolute_move)
@@ -53,7 +79,6 @@ def play(agent=None, learning=True,
 
                 current_duration += 1
                 reward, done, score = game.play_step(absolute_move)
-
                 if learning:
                     state_new = game.get_state()
                     agent.train_short_memory(state_old, move, reward, state_new, done)
@@ -63,7 +88,16 @@ def play(agent=None, learning=True,
             total_score += score
             if score > record:
                 record = score
-                game.save_map()
+                # Save the current map if save is not None
+                try:
+                    if save is not None:
+                        map_path = os.path.join(MODEL_FOLDER_PATH, f"{save}_best_map.png")
+                        os.makedirs(os.path.dirname(map_path), exist_ok=True)
+                        game.save_map(filename=map_path)
+
+                except Exception:
+                    # If anything fails, fallback to default behavior
+                    game.save_map()
                 game.best_score = record
                 max_duration = max(max_duration, current_duration)
             current_duration = 0
@@ -77,7 +111,6 @@ def play(agent=None, learning=True,
 
                 if agent.n_games in [1, 10, 100, 1000, 10000, 100000]:
                     agent.save(f'{save}_{agent.n_games}_sessions')
-                    # agent.model.save(f'{save}_{agent.n_games}_sessions.pth')
 
             if verbose:
                 print(f"Game #{agent.n_games}, Best Score: {record}, Max duration : {max_duration}")
@@ -94,7 +127,10 @@ def play(agent=None, learning=True,
         print("\n Interrupted by Ctrl-C")
         if learning:
             agent.save(f'{save}_{agent.n_games}_sessions')
-            # agent.model.save(f'{save}_{agent.n_games}_sessions.pth')
+    except Exception:
+        print("\n Interrupted")
+        pass
+
     finally:
         if agent.n_games > 0:
             if learning:
@@ -106,7 +142,7 @@ def play(agent=None, learning=True,
         print(f"number of games : {agent.n_games}, Best score = {record}, \
               Max duration : {max_duration} mean score = {mean_score:0.2f} \
                Nb boucle infinie : {game.nb_infini}")
-        if not graphique or not learning:
+        if not graphique and learning:
             plot(plot_scores, plot_mean_scores,
                  epsilon_values, learning)
 
