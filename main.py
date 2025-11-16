@@ -171,3 +171,4 @@ if __name__ == '__main__':
     else:
         play(agent=None, learning=not args.no_learn, verbose=args.verbose,
              graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
+    input("Taper une touche pour fermer")
