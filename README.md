@@ -109,6 +109,7 @@ Ces fichiers montrent que la Q‑function est approchée par un réseau (Linear_
 Cette organisation modulaire facilite l'évaluation (chaque partie du sujet est localisée dans un fichier distinct) .
 
 ### Résultats des essais d'entrainement
+
 | Model | couches  |          vue               | Nb entrainement | Nb game test | durée | Best score | Moyenne | Loop |
 | best  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  753  |     63     |  18.61  | 2.9% |
 | loop  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  640  |     54     |  17.14  | 3.3% | avec détection boucles infinies
