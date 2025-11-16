@@ -1,120 +1,174 @@
+import os
 from game import SnakeGameAI
 from Agent import Agent
-from helper import plot, get_state, calculate_proportions, calc_epsilon
+from helper import plot, print_tensor
+from directions import Direction
 import matplotlib.pyplot as plt
 import argparse
 from tqdm import tqdm
+from constantes import MODEL_FOLDER_PATH
 
-SESSIONS=2000
 
-def ending(agent, learning=False):
+def my_tqdm(iterable, desc=None, total=None):
+    """Minimal tqdm-like iterator used for `--step` mode.
+    """
+    for item in iterable:
+        yield item
+
+
+def ending(agent, learning=False, save="last_model.pth"):
     if learning:
-        agent.model.save('last_model.pth')
-        plt.savefig("training_results.png")
-    print("fin du programme")
+        agent.save(filename=save)
+        file_name_statistique = f"./model/{save}_stat.png"
+        print(f"sauvegarde des statistiques dans {file_name_statistique} ...", end='')
+        plt.savefig(file_name_statistique)
+        print("Ok")
+        try:
+            input("(tapez ENTER to exit)...")
+        except Exception:
+            pass
+    print("Programme terminé.")
 
-def play(agent=None, learning=True, verbose=False, graphique=True, step=False):
+
+def play(agent=None, learning=True,
+         verbose=False, graphique=True,
+         step=False, save="last_model.pth",
+         sessions=100):
     plot_scores = []
     plot_mean_scores = []
     epsilon_values = []
-    plot_prop_random = []
-    plot_prop_neurone = []
-    losses = []
     total_score = 0
-    total_reward = 0
+    score = 0
     record = 0
+    if step:
+        _tqdm = my_tqdm
+    else:
+        _tqdm = tqdm
     game = SnakeGameAI(verbose=verbose,
                        graphique=graphique,
                        back_function=lambda: ending(agent, learning))
     if agent is None:
         agent = Agent()
+
     max_duration = 0
     current_duration = 0
+    if not learning:
+        agent.n_games = 0
+    depart = agent.n_games
+    try:
+        # for _ in tqdm(range(agent.n_games, agent.n_games + sessions), desc='Training' if learning else 'gaming'):
+        for partie in _tqdm(iterable=range(agent.n_games, agent.n_games + sessions),
+                            desc='Training' if learning else 'gaming',
+                            total=sessions):
+            done = False
+            while not done:
+                state_old = game.get_state()
+                if step:
+                    print("*" * 50)  # Ligne de séparation
+                    print(f"\tgame # {partie + 1}/Turn # {current_duration + 1} - Score: {score}")
+                    game.print_snake_vision()
+                    print("-" * 50)
+                    print_tensor(state_old)
+                    print("-" * 50)
+                move: int = agent.get_action(state=state_old, learning=learning)
+                absolute_move = Direction.directions()[move]
+                direction_move = Direction.relative_direction(game.direction, absolute_move)
+                if step:
+                    print(f"direction : {game.direction.name}, relative_move = {direction_move.name}")
+                    game.wait()
 
-    for session in tqdm(range(SESSIONS), desc='Training' if learning else 'gaming'):
-        done = False
-        while not done:
-            state_old = get_state(game)
-            final_move = agent.get_action(state=state_old, game=game, learning=learning)
-            current_duration += 1
-            reward, done, score = game.play_step(final_move, step)
+                current_duration += 1
+                reward, done, score = game.play_step(absolute_move)
+                if learning:
+                    state_new = game.get_state()
+                    agent.train_short_memory(state_old, move, reward, state_new, done)
+                    agent.remember(state_old, move, reward, state_new, done)
+
+            # Done = True
             total_score += score
+            if score > record:
+                record = score
+                # Save the current map if save is not None
+                try:
+                    if save is not None:
+                        map_path = os.path.join(MODEL_FOLDER_PATH, f"{save}_best_map.png")
+                        os.makedirs(os.path.dirname(map_path), exist_ok=True)
+                        game.save_map(filename=map_path)
+
+                except Exception:
+                    # If anything fails, fallback to default behavior
+                    game.save_map()
+                game.best_score = record
+                max_duration = max(max_duration, current_duration)
+            current_duration = 0
+            game.reset()
+            agent.n_games += 1
+            game.nb_game = agent.n_games
 
             if learning:
-                state_new = get_state(game)
-                loss = agent.train_short_memory(state_old, final_move, reward, state_new, done)
-                losses.append(loss)
-                agent.remember(state_old, final_move, reward, state_new, done)
+                epsilon_values.append(round(agent.epsilon * 100, 2))
+                agent.train_long_memory()
 
-            total_reward += reward
+                if agent.n_games in [1, 10, 100, 1000, 10000, 100000]:
+                    agent.save(f'{save}_{agent.n_games}_sessions')
 
-            if done:
-
-                max_duration = max(max_duration, current_duration)
-                current_duration = 0
-                game.reset()
-                agent.n_games += 1
-
-                epsilon_values.append(agent.epsilon)
-                
-                prop_random, prop_neurone = calculate_proportions(agent.n_games)
-                plot_prop_random.append(prop_random)
-                plot_prop_neurone.append(prop_neurone)
-                if score > record:
-                    record = score
-                if learning:
-                    agent.train_long_memory()
-
-                    if agent.n_games in [1, 10, 100]:
-                        agent.model.save(f'model_{agent.n_games}_sessions.pth')
-
-                if verbose:
-                    print(f"Game {agent.n_games}, Best Score: {record}, Mean Score: {total_score / agent.n_games:0.2f}, "
-                        f"Memory Size: {len(agent.memory)}, Exploration: {agent.exploration_count}, Exploitation: {agent.exploitation_count}")
-                plot_scores.append(score)
+            if verbose:
+                print(f"Game #{agent.n_games}, Best Score: {record}, Max duration : {max_duration}")
+            plot_scores.append(score)
+            if learning:
+                plot_mean_scores.append(total_score / (agent.n_games - depart))
+            else:
                 plot_mean_scores.append(total_score / agent.n_games)
 
-                if graphique and not learning:                                        
-                    plot(plot_scores, plot_mean_scores,
-                        plot_prop_random, plot_prop_neurone,
-                        epsilon_values, losses, learning)
-    if not verbose:
-        print(f"Game {agent.n_games}, Best Score: {record}, Mean Score: {total_score / agent.n_games:0.2f}, ")
-    if not graphique:
-        plot(plot_scores, plot_mean_scores,
-            plot_prop_random, plot_prop_neurone,
-            epsilon_values, losses, learning)
-    if learning:
-        mean_loss = sum(losses) / len(losses) if losses else 0
-        if len(losses) >= 100:
-            moving_avg_loss = sum(losses[-100:]) / 100
+            if graphique and learning and not step:
+                plot(plot_scores, plot_mean_scores,
+                     epsilon_values, learning)
+    except KeyboardInterrupt:
+        print("\n Interrupted by Ctrl-C")
+        if learning:
+            agent.save(f'{save}_{agent.n_games}_sessions')
+    except Exception:
+        print("\n Interrupted")
+        pass
+
+    finally:
+        if agent.n_games > 0:
+            if learning:
+                mean_score = total_score / (agent.n_games - depart)
+            else:
+                mean_score = total_score / agent.n_games
         else:
-            moving_avg_loss = sum(losses) / len(losses) if losses else 0
+            mean_score = 0.0
+        print(f"number of games : {agent.n_games}, Best score = {record}, \
+              Max duration : {max_duration} mean score = {mean_score:0.2f} \
+               Nb boucle infinie : {game.nb_infini}")
+        if not graphique and learning:
+            plot(plot_scores, plot_mean_scores,
+                 epsilon_values, learning)
 
-        print(f"Training Summary:")
-        print(f"  - Mean Loss: {mean_loss:.4f}")
-        print(f"  - Last Loss: {losses[-1]:.4f}")
-        print(f"  - Moving Avg Loss (Last 100): {moving_avg_loss:.4f}")
-        print(f"  - Min Loss: {min(losses):.4f}, Max Loss: {max(losses):.4f}")
+        ending(agent=agent, learning=learning, save=save)
 
-    ending(agent=agent, learning=learning)
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description='Train or evaluate the Snake AI.')
     parser.add_argument('--load', type=str, help='Path to the model to load.')
-    parser.add_argument('--session', type=int, default=100, help="Nombre de session de jeux")
+    parser.add_argument('--save', type=str, help="Filename of model to save.")
+    parser.add_argument('--sessions', type=int, default=100, help="Nombre de sessions de jeux")
     parser.add_argument('--no-learn', action='store_true', help='Disable learning mode.')
     parser.add_argument("--verbose", action='store_true', help="Mode verbeux et graphique")
     parser.add_argument("--no-graphic", action='store_true', help="mode non graphique")
     parser.add_argument("--step", action='store_true', help="show step by step the learning")
     args = parser.parse_args()
-    SESSIONS = int(args.session)
+    sessions = int(args.sessions)
+    if not os.path.exists(MODEL_FOLDER_PATH):
+        os.makedirs(MODEL_FOLDER_PATH)
     if args.load:
-        agent = Agent()
-        agent.model.load(args.load)
-        play(agent=agent, learning=not args.no_learn, verbose=args.verbose,
-             graphique=not args.no_graphic, step=args.step)
+        agent = Agent(args.load)
+        if agent.load():
+            play(agent=agent, learning=not args.no_learn, verbose=args.verbose,
+                 graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
     else:
         play(agent=None, learning=not args.no_learn, verbose=args.verbose,
-             graphique=not args.no_graphic, step=args.step)
-    input("taper ENTER pour fermer")
+             graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
+    input("Taper une touche pour fermer")
