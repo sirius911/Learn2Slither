@@ -110,9 +110,10 @@ Cette organisation modulaire facilite l'évaluation (chaque partie du sujet est 
 
 ### Résultats des essais d'entrainement
 
-| Model | couches  |          vue               | Nb entrainement | Nb game test | durée | Best score | Moyenne | Loop |
-| best  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  753  |     63     |  18.61  | 2.9% |
-| loop  | 16-256-4 | 4 x dist dangers + Green A |       15000     |      10000   |  640  |     54     |  17.14  | 3.3% | avec détection boucles infinies
+| Model | couches neurones |          vue               | Nb entrainement | Nb game test | durée | Best score | Moyenne | Loop |
+|-------|----------|----------------------------|-----------------|--------------|-------|------------|--------|------|
+| best  | 16-256-4 | 4 x dist dangers + Green A |       150000    |      10000   |  753  |     63     |  18.61  | 2.9% |
+| loop  | 16-256-4 | 4 x dist dangers + Green A |       150000    |      10000   |  640  |     54     |  17.14  | 3.3% | avec détection boucles infinies
 
 infinity avec reward -300 < error reward sur 10000 parties
 number of games : 10000, Best score = 55,               Max duration : 604 mean score = 11.38                Nb boucle infinie : 57,17%

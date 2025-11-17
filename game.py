@@ -10,7 +10,7 @@ from constantes import reward_green_apple, reward_infini_boucle
 import colors
 
 pygame.init()
-font = pygame.font.SysFont('arial', 18)
+font = pygame.font.SysFont(None, 18)
 
 
 Point = namedtuple('Point', 'x, y')

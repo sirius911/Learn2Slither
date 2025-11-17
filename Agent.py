@@ -3,9 +3,13 @@ import os
 import torch
 import random
 from collections import deque  # data structure to store memory
-from model import Linear_QNet, QTrainer  # importing the neural net from step 2
+from model import Linear_QNet, QTrainer
 from helper import calc_epsilon
 from constantes import MAX_MEMORY, GAMMA, LR, MODEL_FOLDER_PATH
+try:
+    from torchviz import make_dot
+except ImportError:
+    make_dot = None
 
 
 class Agent:
@@ -116,3 +120,92 @@ class Agent:
             print(f"Info file not found[{file_info}], starting with n_games = 0")
 
         return self.model.load(filename)
+
+    def visualize_model(self, filename=None, example_state=None):
+        """
+        Génère un fichier PNG représentant le graphe du réseau de neurones
+        actuel (avec les poids déjà chargés/entraînés).
+
+        Le fichier est sauvegardé dans MODEL_FOLDER_PATH, avec suffixe '_graph.png'.
+        """
+        if make_dot is None:
+            print("torchviz n'est pas installé. Fais : pip install torchviz graphviz")
+            return
+
+        # Nom de fichier de base
+        if filename is None:
+            filename = self.name
+
+        # Base du chemin sans extension
+        output_base = os.path.join(MODEL_FOLDER_PATH, f"{filename}_graph")
+
+        # Exemple d'état : soit fourni, soit généré
+        if example_state is None:
+            first_param = next(self.model.parameters())
+            # Pour une couche Linear, weight a la forme (out_features, in_features)
+            if first_param.dim() >= 2:
+                in_features = first_param.shape[1]
+            else:
+                raise RuntimeError("Impossible de déduire le nombre de features en entrée.")
+
+            # On crée un batch de 1 avec le bon nombre de features
+            example_state = torch.randn(1, in_features, dtype=torch.float32)
+        else:
+            if not isinstance(example_state, torch.Tensor):
+                example_state = torch.tensor(example_state, dtype=torch.float32)
+            if example_state.dim() == 1:
+                example_state = example_state.unsqueeze(0)
+
+        # Forward pour construire le graphe
+        y = self.model(example_state)
+
+        # Création du graphe
+        dot = make_dot(y, params=dict(self.model.named_parameters()))
+
+        # Sauvegarde en PNG (dot.render ajoute '.png')
+        dot.render(output_base, format="png")
+
+        print(f"Graphe du modèle sauvegardé dans : {output_base}.png")
+
+    def export_onnx(self, filename=None):
+        """
+        Exporte le modèle actuel au format ONNX pour visualisation (ex : dans Netron).
+
+        Le fichier est sauvegardé dans MODEL_FOLDER_PATH avec l'extension .onnx.
+        """
+        # Nom de base
+        if filename is None:
+            filename = self.name
+
+        onnx_path = os.path.join(MODEL_FOLDER_PATH, f"{filename}.onnx")
+
+        # Déduction automatique du nombre de features en entrée
+        first_param = next(self.model.parameters())
+        if first_param.dim() >= 2:
+            in_features = first_param.shape[1]
+        else:
+            raise RuntimeError("Impossible de déduire le nombre de features en entrée.")
+
+        # Tensor d'entrée fictif : batch de 1
+        example_state = torch.randn(1, in_features, dtype=torch.float32)
+
+        # Très important : passer en mode eval pour l'export
+        self.model.eval()
+
+        print(f"Export du modèle en ONNX vers {onnx_path} ...", end=" ")
+
+        torch.onnx.export(
+            self.model,
+            example_state,         # input exemple
+            onnx_path,             # chemin du fichier de sortie
+            input_names=["state"],  # nom logique de l'entrée
+            output_names=["q_values"],  # nom logique de la sortie
+            dynamic_axes={         # batch dimension flexible
+                "state": {0: "batch_size"},
+                "q_values": {0: "batch_size"},
+            },
+            opset_version=17       # version ONNX raisonnablement récente
+        )
+
+        print("OK")
+        return onnx_path

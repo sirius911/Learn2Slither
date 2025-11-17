@@ -17,12 +17,26 @@ def my_tqdm(iterable, desc=None, total=None):
 
 
 def ending(agent, learning=False, save="last_model.pth"):
+
     if learning:
         agent.save(filename=save)
+
+        try:
+            agent.visualize_model(filename=save)
+        except Exception as e:
+            print(f"Impossible de générer le graphe du modèle : {e}")
+
+        try:
+            onnx_path = agent.export_onnx(filename=save)
+            print(f"Modèle ONNX prêt pour Netron (https://netron.app/): {onnx_path}")
+        except Exception as e:
+            print(f"Impossible d'exporter le modèle en ONNX : {e}")
+
         file_name_statistique = f"./model/{save}_stat.png"
         print(f"sauvegarde des statistiques dans {file_name_statistique} ...", end='')
         plt.savefig(file_name_statistique)
         print("Ok")
+
         try:
             input("(tapez ENTER to exit)...")
         except Exception:
@@ -154,7 +168,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train or evaluate the Snake AI.')
     parser.add_argument('--load', type=str, help='Path to the model to load.')
     parser.add_argument('--save', type=str, help="Filename of model to save.")
-    parser.add_argument('--sessions', type=int, default=100, help="Nombre de sessions de jeux")
+    parser.add_argument('--sessions', type=int, default=100, help="Nombre de sessions de jeux (default: 100).")
     parser.add_argument('--no-learn', action='store_true', help='Disable learning mode.')
     parser.add_argument("--verbose", action='store_true', help="Mode verbeux et graphique")
     parser.add_argument("--no-graphic", action='store_true', help="mode non graphique")
@@ -171,4 +185,3 @@ if __name__ == '__main__':
     else:
         play(agent=None, learning=not args.no_learn, verbose=args.verbose,
              graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
-    input("Taper une touche pour fermer")
