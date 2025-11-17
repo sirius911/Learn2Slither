@@ -42,6 +42,13 @@ entrainement du modèle *essais* avec 1000 sessions sans graphique. Le modèle s
 - *model/essais/model_1_sessions.pth*
 - *model_10_sessions.pth* etc...
 
+il sauvegarde aussi :
+
+- le diagram du réseau de neurone (_graph et _graph.png)
+- la fin de la meilleur partie (meilleur score) dans _best_map.png
+- les statistiques d'entrainement dans _stat.png
+- une exportation en .onnx (pour visualisation avec [https://netron.app/](https://netron.app/))
+
 #### Pour l'évaluation
 
 ```bash
@@ -112,20 +119,10 @@ Cette organisation modulaire facilite l'évaluation (chaque partie du sujet est 
 
 | Model | couches neurones |          vue               | Nb entrainement | Nb game test | durée | Best score | Moyenne | Loop |
 |-------|----------|----------------------------|-----------------|--------------|-------|------------|--------|------|
-| best  | 16-256-4 | 4 x dist dangers + Green A |       150000    |      10000   |  753  |     63     |  18.61  | 2.9% |
-| loop  | 16-256-4 | 4 x dist dangers + Green A |       150000    |      10000   |  640  |     54     |  17.14  | 3.3% | avec détection boucles infinies
+| best  | 16-512-4 | 4 x dist dangers + Green A |       150000    |      1000   |  492  |     53     |  18.83  | 28% |
 
-infinity avec reward -300 < error reward sur 10000 parties
-number of games : 10000, Best score = 55,               Max duration : 604 mean score = 11.38                Nb boucle infinie : 57,17%
+![structure neurones](model/best/last_model.onnx.png "onnx")
 
-infinity avec reward == error reward sur 10000 parties
-number of games : 10000, Best score = 60,               Max duration : 529 mean score = 15.81                Nb boucle infinie : 39.72%
-
-1er Essais avec reload sur 10000 entrainements meme infinity reward qu'au dessus:
-number of games : 10000, Best score = 57,               Max duration : 584 mean score = 20.72                Nb boucle infinie : 28,81%
-
-2eme Essais avec reload sur 10000 entrainements meme infinity reward qu'au dessus:
-number of games : 10000, Best score = 51,               Max duration : 467 mean score = 16.53                Nb boucle infinie : 3663
 
 ## liens
 
