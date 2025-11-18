@@ -4,9 +4,33 @@
 
 **Objectif** : créer un agent qui apprend à jouer au *Snake* sur une grille 10x10 en maximisant une fonction de récompense. Le but pédagogique est d'implémenter un algorithme de **Q‑learning** (ici approché par un réseau de neurones) et de démontrer l'amélioration du comportement avec l'entraînement (modèles 1, 10, 100, ... sessions).
 
-Principes d'apprentissage mis en œuvre :
-- Représentation de l'état : pour chaque direction (haut, gauche, bas, droite) le réseau reçoit 4 valeurs — distance au mur, distance au danger (corps ou situation dangereuse), distance à la pomme verte, distance à la pomme rouge — formant un tenseur de forme `[1, 16]` (implémenté dans `game.py::get_state`).
-- Politique d'action : epsilon‑greedy — `Agent.get_action` utilise `calc_epsilon(n_games)` (dans `helper.py`) pour diminuer progressivement l'exploration et privilégier l'exploitation.
+
+### Concepts de base : apprentissage par renforcement (RL)
+
+Ce projet utilise les principes de l'apprentissage par renforcement (Reinforcement Learning, RL). Ci-dessous un rappel concis des concepts clefs et du cycle d'interaction agent/environnement, suivi d'un lien rapide avec le code du dépôt.
+
+- Agent : l'entité qui prend des décisions (ici implémentée dans `Agent.py`).
+- Environnement : le monde dans lequel l'agent agit (ici `SnakeGameAI` dans `game.py`).
+- État (state) : représentation observée par l'agent à chaque pas (ici `game.get_state()` renvoie un tenseur `[1,16]`).
+- Action : choix que l'agent peut effectuer (ici 4 actions correspondantes aux directions, gérées via `directions.py` et `Agent.get_action`).
+- Récompense (reward) : signal numérique retourné par l'environnement après une action; guide l'apprentissage (valeurs dans `constantes.py`).
+- Politique (policy) : stratégie de sélection d'actions; ici epsilon‑greedy (implémentée dans `Agent.get_action` et `helper.calc_epsilon`).
+- Fonction de valeur / Q‑function : évalue la qualité d'une action dans un état; approximée ici par `Linear_QNet` (dans `model.py`).
+- Épisode : séquence d'interactions s'arrêtant quand l'agent meurt ou qu'une condition terminale est atteinte. Le dépôt utilise des sessions/parties (`--sessions`).
+- Exploration vs Exploitation : compromis géré par epsilon décroissant (plus d'exploration au début puis exploitation des meilleures actions).
+
+Cycle RL (boucle par pas)
+1. L'agent observe l'état s_t fourni par l'environnement.
+2. L'agent choisit une action a_t selon sa politique (ex. epsilon‑greedy).
+3. L'environnement exécute a_t, retourne la récompense r_t et le nouvel état s_{t+1}, et signale si l'épisode est terminé.
+4. La transition (s_t, a_t, r_t, s_{t+1}, done) est stockée en mémoire (replay buffer).
+5. L'agent met à jour sa représentation de la Q‑fonction (ou sa politique) à partir d'échantillons de la mémoire ou en apprentissage immédiat (short memory).
+6. Répéter jusqu'à la fin de l'épisode, puis recommencer pour plusieurs épisodes (sessions).
+
+
+### Principes d'apprentissage mis en œuvre :
+- Représentation de l'état : pour chaque direction (haut, gauche, bas, droite) le réseau reçoit 4 valeurs -- distance au mur, distance au danger (corps ou situation dangereuse), distance à la pomme verte, distance à la pomme rouge -- formant un tenseur de forme `[1, 16]` (implémenté dans `game.py::get_state`).
+- Politique d'action : epsilon‑greedy -- `Agent.get_action` utilise `calc_epsilon(n_games)` (dans `helper.py`) pour diminuer progressivement l'exploration et privilégier l'exploitation.
 - Approximation de Q : un réseau fully-connected (`Linear_QNet` dans `model.py`) estime la valeur Q pour chaque action (4 sorties). Le forward renvoie les Q‑valeurs pour l'état en entrée.
 - Mise à jour : `QTrainer.train_step` calcule la perte MSE entre la prédiction et la cible (reward + gamma * max Q(next_state)) et effectue la rétropropagation (optimiseur Adam). Les mises à jour sont appelées depuis `Agent.train_short_memory` (mise à jour immédiate) et `Agent.train_long_memory` (apprentissage par batch depuis la mémoire, voir `Agent.memory`).
 - Mémoire et batchs : l'agent stocke les transitions dans une deque (`MAX_MEMORY`) et prélève des mini‑lots pour l'entraînement long afin de réduire la corrélation temporelle.
@@ -87,7 +111,6 @@ direction : LEFT, relative_move = STRAIGHT
 ```
 
 ---
-
 
 ### justifications techniques
 
