@@ -3,6 +3,7 @@ import random
 from collections import deque, namedtuple
 import numpy as np
 import torch
+import os
 from directions import Direction
 from constantes import GRID_SIZE, BLOCK_SIZE, SPEED
 from constantes import reward_game_over, reward_red_apple, reward_nothing
@@ -26,10 +27,22 @@ class SnakeGameAI:
         self.graphique = graphique
         self.back_function = back_function
         self.block_size = BLOCK_SIZE
+        # Sprite container
+        self.sprites = {}
+        self.sprites_loaded = False
         if self.graphique:
+            # Create display before loading sprites because convert_alpha() needs a video mode
             self.display = pygame.display.set_mode((self.w_window, self.h_window))
             pygame.display.set_caption('Snake')
             self.clock = pygame.time.Clock()
+
+        # Try to load assets (sprite-sheet + apples)
+        try:
+            self._load_sprites()
+        except Exception as e:
+            # If anything fails, we keep sprites_loaded = False and fallback to rects
+            if self.verbose:
+                print(f"Warning: failed to load sprites, falling back to block rendering.\n{e}")
         self.best_score = 0
         self.nb_game = 0
         self.nb_infini = 0
@@ -70,22 +83,35 @@ class SnakeGameAI:
             pygame.draw.line(surface, colors.GRAY, (play_area_x, y), (play_area_x + play_area_w, y), 1)
 
         # Dessiner le serpent (en tenant compte du décalage des murs)
-        for i, pt in enumerate(self.snake[1:]):
+        # We support sprite rendering if sprites were loaded, otherwise fallback to rectangles
+        for i, pt in enumerate(self.snake):
             snake_x = pt.x + BLOCK_SIZE  # Décalage pour compenser les murs
             snake_y = pt.y + BLOCK_SIZE
-            # if i == 0:  # Tête
-            #     self._draw_snake_head_on_surface(surface, Point(snake_x, snake_y))
-            # else:
-            pygame.draw.rect(surface, colors.BLUE1, pygame.Rect(snake_x, snake_y, BLOCK_SIZE, BLOCK_SIZE))
-            pygame.draw.rect(surface, colors.BLUE2, pygame.Rect(snake_x + 4, snake_y + 4, 12, 12))
-        # dessine tete:
-        snake_x = self.snake[0].x + BLOCK_SIZE
-        snake_y = self.snake[0].y + BLOCK_SIZE
-        self._draw_snake_head_on_surface(surface, Point(snake_x, snake_y))
+            if self.sprites_loaded:
+                key = self._sprite_key_for_segment(i)
+                sprite = self.sprites.get(key)
+                if sprite:
+                    surface.blit(sprite, (snake_x, snake_y))
+                    continue
+            # fallback: original rectangles
+            if i == 0:
+                # head will be drawn below via polygon fallback
+                self._draw_snake_head_on_surface(surface, Point(snake_x, snake_y))
+            else:
+                pygame.draw.rect(surface, colors.BLUE1, pygame.Rect(snake_x, snake_y, BLOCK_SIZE, BLOCK_SIZE))
+                inner = max(0, BLOCK_SIZE - 8)
+                pygame.draw.rect(surface, colors.BLUE2, pygame.Rect(snake_x + 4, snake_y + 4, inner, inner))
         # Dessiner les pommes (elles doivent aussi être décalées)
         for food in self.foods:
             food_x = food['position'].x + BLOCK_SIZE
             food_y = food['position'].y + BLOCK_SIZE
+            if self.sprites_loaded:
+                key = 'apple_green' if food['type'] == 'green' else 'apple_red'
+                sprite = self.sprites.get(key)
+                if sprite:
+                    surface.blit(sprite, (food_x, food_y))
+                    continue
+            # fallback
             color = colors.GREEN if food['type'] == 'green' else colors.RED
             pygame.draw.rect(surface, color, pygame.Rect(food_x, food_y, BLOCK_SIZE, BLOCK_SIZE))
 
@@ -116,6 +142,139 @@ class SnakeGameAI:
         self.recent_paths = []
         if self.graphique:
             self._update_ui()
+
+    def _load_sprites(self):
+        """Charge les sprites depuis le dossier assets et les stocke dans self.sprites.
+        Attendu : assets/snake.png, assets/green_apple.png, assets/red_apple.png
+        Les coordonnées des sous-images sont codées selon le manifeste fourni par l'utilisateur.
+        """
+        assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
+        snake_path = os.path.join(assets_dir, 'snake.png')
+        green_path = os.path.join(assets_dir, 'green_apple.png')
+        red_path = os.path.join(assets_dir, 'red_apple.png')
+
+        if not os.path.exists(snake_path):
+            raise FileNotFoundError(f"{snake_path} not found")
+
+        sheet = pygame.image.load(snake_path)
+        # convert_alpha is faster but requires a video mode; only convert if display is initialized
+        if pygame.display.get_init():
+            try:
+                sheet = sheet.convert_alpha()
+            except Exception:
+                # fall back to unconverted surface
+                pass
+        FRAME = 40
+
+        parts = {
+            'snake_head_up': (120, 0), 'snake_head_right': (160, 0),
+            'snake_head_down': (120, 40), 'snake_head_left': (160, 40),
+            'body_vertical': (80, 0), 'body_horizontal': (80, 40),
+            'body_top_left': (240, 40), 'body_bottom_left': (240, 0),
+            'body_bottom_right': (200, 40), 'body_top_right': (200, 0),
+            'snake_tail_up': (40, 40), 'snake_tail_right': (0, 40),
+            'snake_tail_left': (40, 0), 'snake_tail_down': (0, 0)
+        }
+
+        # mapping from sheet keys to internal sprite keys
+        key_map = {
+            'snake_head_up': 'head_up', 'snake_head_right': 'head_right',
+            'snake_head_down': 'head_down', 'snake_head_left': 'head_left',
+            'body_vertical': 'body_v', 'body_horizontal': 'body_h',
+            'body_top_left': 'corner_ul', 'body_top_right': 'corner_ur',
+            'body_bottom_left': 'corner_dl', 'body_bottom_right': 'corner_dr',
+            'snake_tail_up': 'tail_up', 'snake_tail_right': 'tail_right',
+            'snake_tail_down': 'tail_down', 'snake_tail_left': 'tail_left'
+        }
+
+        # extract sprites
+        for k, (x, y) in parts.items():
+            rect = pygame.Rect(x, y, FRAME, FRAME)
+            sub = sheet.subsurface(rect).copy()
+            # scale only if FRAME != BLOCK_SIZE
+            if FRAME != BLOCK_SIZE:
+                sub = pygame.transform.smoothscale(sub, (BLOCK_SIZE, BLOCK_SIZE))
+            self.sprites[key_map[k]] = sub
+
+        # apples
+        if os.path.exists(green_path):
+            g = pygame.image.load(green_path)
+            if pygame.display.get_init():
+                try:
+                    g = g.convert_alpha()
+                except Exception:
+                    pass
+            if g.get_width() != BLOCK_SIZE or g.get_height() != BLOCK_SIZE:
+                g = pygame.transform.smoothscale(g, (BLOCK_SIZE, BLOCK_SIZE))
+            self.sprites['apple_green'] = g
+        if os.path.exists(red_path):
+            r = pygame.image.load(red_path)
+            if pygame.display.get_init():
+                try:
+                    r = r.convert_alpha()
+                except Exception:
+                    pass
+            if r.get_width() != BLOCK_SIZE or r.get_height() != BLOCK_SIZE:
+                r = pygame.transform.smoothscale(r, (BLOCK_SIZE, BLOCK_SIZE))
+            self.sprites['apple_red'] = r
+
+        self.sprites_loaded = True
+
+    def _sprite_key_for_segment(self, idx: int) -> str:
+        """Retourne la clé de sprite à utiliser pour le segment d'indice idx dans self.snake.
+        Les indices suivent self.snake: 0=head, -1=tail.
+        """
+        n = len(self.snake)
+        # head
+        if idx == 0:
+            return f'head_{self.direction.name.lower()}'
+        # tail
+        if idx == n - 1:
+            if n >= 2:
+                prev = self.snake[-2]
+                tail = self.snake[-1]
+                dx = tail.x - prev.x
+                dy = tail.y - prev.y
+                if dx > 0:
+                    return 'tail_right'
+                if dx < 0:
+                    return 'tail_left'
+                if dy > 0:
+                    return 'tail_down'
+                return 'tail_up'
+            else:
+                return f'head_{self.direction.name.lower()}'
+
+        # middle segments: decide if vertical / horizontal / corner
+        curr = self.snake[idx]
+        prev = self.snake[idx - 1]
+        nxt = self.snake[idx + 1]
+
+        # normalized directions (-1,0,1)
+        def norm(v):
+            return (0 if v == 0 else (1 if v > 0 else -1))
+
+        v1 = (norm((prev.x - curr.x) // BLOCK_SIZE), norm((prev.y - curr.y) // BLOCK_SIZE))
+        v2 = (norm((nxt.x - curr.x) // BLOCK_SIZE), norm((nxt.y - curr.y) // BLOCK_SIZE))
+
+        # straight
+        if v1[0] == v2[0] == 0:
+            return 'body_v'
+        if v1[1] == v2[1] == 0:
+            return 'body_h'
+
+        dirs = {v1, v2}
+        if dirs == {(0, -1), (-1, 0)}:
+            return 'corner_ul'
+        if dirs == {(0, -1), (1, 0)}:
+            return 'corner_ur'
+        if dirs == {(0, 1), (-1, 0)}:
+            return 'corner_dl'
+        if dirs == {(0, 1), (1, 0)}:
+            return 'corner_dr'
+
+        # fallback
+        return 'body_h'
 
     def _place_snake(self):
         # Choisir une orientation aléatoire : horizontal ou vertical
