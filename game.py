@@ -146,7 +146,6 @@ class SnakeGameAI:
     def _load_sprites(self):
         """Charge les sprites depuis le dossier assets et les stocke dans self.sprites.
         Attendu : assets/snake.png, assets/green_apple.png, assets/red_apple.png
-        Les coordonnées des sous-images sont codées selon le manifeste fourni par l'utilisateur.
         """
         assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
         snake_path = os.path.join(assets_dir, 'snake.png')
@@ -740,4 +739,3 @@ class SnakeGameAI:
         Normalise une distance en la divisant par la plus grande distance possible.
         """
         return min(distance / (GRID_SIZE - 1), 1.0)
-        # return distance / (GRID_SIZE - 1)
