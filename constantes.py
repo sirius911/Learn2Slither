@@ -9,7 +9,7 @@ GAMMA = 0.99
 
 # game
 GRID_SIZE = 10  # 10x10
-BLOCK_SIZE = 40
+BLOCK_SIZE = 20
 SPEED = 80
 
 # rewards

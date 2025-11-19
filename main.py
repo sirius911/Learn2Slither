@@ -1,4 +1,5 @@
 import os
+import sys
 from game import SnakeGameAI
 from Agent import Agent
 from helper import plot, print_tensor
@@ -6,7 +7,7 @@ from directions import Direction
 import matplotlib.pyplot as plt
 import argparse
 from tqdm import tqdm
-from constantes import MODEL_FOLDER_PATH
+from constantes import MODEL_FOLDER_PATH, GRID_SIZE
 
 
 def my_tqdm(iterable, desc=None, total=None):
@@ -47,7 +48,9 @@ def ending(agent, learning=False, save="last_model.pth"):
 def play(agent=None, learning=True,
          verbose=False, graphique=True,
          step=False, save="last_model.pth",
-         sessions=100):
+         sessions=100,
+         green=2,
+         red=1):
     plot_scores = []
     plot_mean_scores = []
     epsilon_values = []
@@ -60,7 +63,9 @@ def play(agent=None, learning=True,
         _tqdm = tqdm
     game = SnakeGameAI(verbose=verbose,
                        graphique=graphique,
-                       back_function=lambda: ending(agent, learning))
+                       back_function=lambda: ending(agent, learning),
+                       nb_green_apple=green,
+                       nb_red_apple=red)
     if agent is None:
         agent = Agent()
 
@@ -169,19 +174,33 @@ if __name__ == '__main__':
     parser.add_argument('--load', type=str, help='Path to the model to load.')
     parser.add_argument('--save', type=str, help="Filename of model to save.")
     parser.add_argument('--sessions', type=int, default=100, help="Nombre de sessions de jeux (default: 100).")
+    parser.add_argument('--green', type=int, default=2, help="Nombre de pommes verte (default: 2).")
+    parser.add_argument('--red', type=int, default=1, help="Nombre de pommes verte (default: 1).")
     parser.add_argument('--no-learn', action='store_true', help='Disable learning mode.')
     parser.add_argument("--verbose", action='store_true', help="Mode verbeux et graphique")
     parser.add_argument("--no-graphic", action='store_true', help="mode non graphique")
     parser.add_argument("--step", action='store_true', help="show step by step the learning")
     args = parser.parse_args()
     sessions = int(args.sessions)
+    nb_green_apple = int(args.green)
+    nb_red_apple = int(args.red)
+    if nb_green_apple >= (GRID_SIZE * GRID_SIZE) or nb_red_apple >= (GRID_SIZE * GRID_SIZE) \
+       or (nb_green_apple + nb_red_apple) >= (GRID_SIZE * GRID_SIZE):
+        print("Trops de fruits tuent les fruits !!")
+        sys.exit(1)
+    if nb_green_apple <= 0:
+        nb_green_apple = 2
+    if nb_red_apple <= 0:
+        nb_red_apple = 1
     if not os.path.exists(MODEL_FOLDER_PATH):
         os.makedirs(MODEL_FOLDER_PATH)
     if args.load:
         agent = Agent(args.load)
         if agent.load():
             play(agent=agent, learning=not args.no_learn, verbose=args.verbose,
-                 graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
+                 graphique=not args.no_graphic, step=args.step, save=args.save,
+                 sessions=sessions, green=nb_green_apple, red=nb_red_apple)
     else:
         play(agent=None, learning=not args.no_learn, verbose=args.verbose,
-             graphique=not args.no_graphic, step=args.step, save=args.save, sessions=sessions)
+             graphique=not args.no_graphic, step=args.step, save=args.save,
+             sessions=sessions, green=nb_green_apple, red=nb_red_apple)

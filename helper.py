@@ -8,11 +8,11 @@ import pandas as pd
 plt.ion()
 
 # Initialisation de la figure globale et des axes
-fig, ax1, ax2, ax3 = None, None, None, None
+fig, ax1 = None, None
 
 
 def plot(scores, mean_scores, epsilon_values, learning):
-    global fig, ax1, ax2, ax3  # Variables globales pour la figure et les axes
+    global fig, ax1  # Variables globales pour la figure et les axes
 
     title = ('Training' if learning else 'Gaming')
 

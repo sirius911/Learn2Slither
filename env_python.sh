@@ -5,7 +5,7 @@
 
 # source my_script.sh
 
-ENV_NAME=_env
+ENV_NAME=~/goinfre/_env
 
 PYTHON=python3.10
 

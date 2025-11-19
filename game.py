@@ -18,7 +18,9 @@ Point = namedtuple('Point', 'x, y')
 
 
 class SnakeGameAI:
-    def __init__(self, verbose=False, graphique=True, back_function=None):
+    def __init__(self, verbose=False, graphique=True,
+                 back_function=None, nb_green_apple=2,
+                 nb_red_apple=1):
         self.w = GRID_SIZE * BLOCK_SIZE
         self.h = GRID_SIZE * BLOCK_SIZE
         self.w_window = (GRID_SIZE + 2) * BLOCK_SIZE
@@ -27,6 +29,8 @@ class SnakeGameAI:
         self.graphique = graphique
         self.back_function = back_function
         self.block_size = BLOCK_SIZE
+        self.nb_green_apple = nb_green_apple
+        self.nb_red_apple = nb_red_apple
         # Sprite container
         self.sprites = {}
         self.sprites_loaded = False
@@ -312,9 +316,10 @@ class SnakeGameAI:
 
     def _place_initial_food(self):
         self.foods = []
-        for _ in range(2):  # Deux pommes vertes
+        for _ in range(self.nb_green_apple):  # NB_GREEN_APPLE pommes vertes
             self.foods.append({'type': 'green', 'position': self._get_random_position()})
-        self.foods.append({'type': 'red', 'position': self._get_random_position()})  # Une pomme rouge
+        for _ in range(self.nb_red_apple):
+            self.foods.append({'type': 'red', 'position': self._get_random_position()})  # pomme(s) rouge(s)
 
     def _get_random_position(self):
         x = random.randint(0, (self.w - BLOCK_SIZE) // BLOCK_SIZE) * BLOCK_SIZE

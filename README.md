@@ -49,7 +49,9 @@ Impact pratique de ces réglages : une architecture plus profonde/large et un en
 - `--load <name>` : charge le modèle `<name>.pth` depuis `./model/` (ex. `--load best/last_model`).
 - `--no-learn` : mode évaluation (le réseau n'est pas mis à jour pendant les parties).
 - `--no-graphic` : désactive Pygame (utile pour accélérer les runs batchs).
-- `--sessions N` : nombre de sessions / parties à exécuter.
+- `--green N` : Nombre de pommes vertes(defaut 2).
+- `--red N` : Nombre de pommes rouges (defaut 1).
+- `--sessions N` : nombre de sessions / parties à exécuter (defaut 100).
 - `--verbose` : active quelques sorties explicites par partie (utile pour débug).
 - `--step` : active le mode pas-à-pas (affiche la vision textuelle et attend ENTER entre étapes).
 
