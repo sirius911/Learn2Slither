@@ -18,20 +18,10 @@ def plot(scores, mean_scores, epsilon_values, learning):
 
     # Initialisation unique de la figure avec 3 sous-graphiques
     if fig is None:
-        # if learning:
-        #     fig, axes = plt.subplots(3, 1, figsize=(10, 12))
-        #     ax1, ax2, ax3 = axes
-        # else:
         fig, axes = plt.subplots(1, 1, figsize=(10, 12))
         ax1 = axes
         fig.suptitle(title)
 
-    # # Effacer le contenu des axes sans recréer la figure
-    # if learning:
-    #     ax1.clear()
-    #     ax2.clear()
-    #     ax3.clear()  # Toujours nettoyé, mais n'est pas utilisé si `learning=False`
-    # else:
     ax1.clear()
 
     # --- Premier graphique : Scores et Epsilon ---
@@ -83,9 +73,6 @@ def plot(scores, mean_scores, epsilon_values, learning):
     ax1.legend(loc='upper left')
     ax1.grid(alpha=0.3)
 
-    # Mettre à jour la disposition et afficher
-    # plt.tight_layout(rect=[0, 0, 1, 0.95])
-    # plt.subplots_adjust(top=0.9, bottom=0.1)  # Ajustez les valeurs selon vos besoins
     plt.pause(0.1)
 
 
@@ -97,46 +84,7 @@ def print_tensor(tensor: torch.Tensor):
     print(df)
 
 
-# def find_snake_direction(liste):
-#     # Convertir la liste en tableau 12x12
-#     tableau = np.array(liste).reshape(12, 12)
-
-#     # Trouver les positions de la tête (valeur 2) et des queues (valeur 3)
-#     head_pos = np.argwhere(tableau == 2)
-#     tail_pos = np.argwhere(tableau == 3)
-
-#     if len(head_pos) == 0 or len(tail_pos) == 0:
-#         raise ValueError("Le tableau ne contient pas de tête (2) ou de queue (3).")
-
-#     # La tête et la queue sont des tableaux avec une seule position
-#     head_pos = head_pos[0]  # Exemple : [i, j] pour la tête
-#     tail_pos = tail_pos[0]  # Exemple : [i, j] pour la queue
-
-#     # Calculer la direction en fonction des coordonnées
-#     if head_pos[0] == tail_pos[0]:  # Même ligne
-#         if head_pos[1] < tail_pos[1]:
-#             return Direction.LEFT
-#         else:
-#             return Direction.RIGHT
-#     elif head_pos[1] == tail_pos[1]:  # Même colonne
-#         if head_pos[0] < tail_pos[0]:
-#             return Direction.UP
-#         else:
-#             return Direction.DOWN
-#     else:
-#         raise ValueError("La tête et la queue ne sont pas alignées correctement")
-
-
 def calc_epsilon(n_games):
     # epsilon = max(0.01, 80 - (n_games // 200))
     epsilon = 0.099 * math.exp(-n_games / 1000)
     return epsilon
-
-# def calculate_proportions(n_games):
-#     epsilon = calc_epsilon(n_games)
-
-#     # Proportions
-#     proportion_random = epsilon / 100
-#     proportion_nn = 1 - proportion_random
-
-#     return proportion_random, proportion_nn

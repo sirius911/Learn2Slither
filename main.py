@@ -146,13 +146,13 @@ def play(agent=None, learning=True,
         pass
 
     finally:
-        if agent.n_games > 0:
+        if agent.n_games > 0 and (agent.n_games - depart) != 0:
             if learning:
                 mean_score = total_score / (agent.n_games - depart)
             else:
                 mean_score = total_score / agent.n_games
         else:
-            mean_score = 0.0
+            mean_score = total_score
         print(f"number of games : {agent.n_games}, Best score = {record}, \
               Max duration : {max_duration} mean score = {mean_score:0.2f} \
                Nb boucle infinie : {game.nb_infini}")
