@@ -30,7 +30,7 @@ echo
 # Install the requirements in the virtualenv.
 echo "Installing the requirements..."
 $PYTHON -m pip install --upgrade pip
-$PYTHON -m pip install -r requirement.txt
+$PYTHON -m pip install -r requirements.txt
 echo
 
 alias norminette_python=flake8
